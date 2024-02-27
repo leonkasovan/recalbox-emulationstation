@@ -10,7 +10,7 @@
 
 bool Case::SetCaseInBoot(const String& theCase)
 {
-  IniFile bootConf(Path("/boot/recalbox-boot.conf"), false);
+  IniFile bootConf(Path("/boot/recalbox-boot.conf"), false, true);
   bootConf.SetString("case", theCase);
   bootConf.Save();
   return true;
@@ -135,7 +135,12 @@ Case Case::CurrentCase()
 std::vector<Case> Case::SupportedManualCases()
 {
   std::vector<Case> list;
-  if (Board::Instance().GetBoardType() == BoardType::Pi4)
+  if (Board::Instance().GetBoardType() == BoardType::Pi5)
+  {
+    list.push_back(Case::Create(Case::CaseModel::RaspberryPiTouchDisplay));
+    list.push_back(Case::Create(Case::CaseModel::None));
+  }
+  else if (Board::Instance().GetBoardType() == BoardType::Pi4)
   {
     list.push_back(Case::Create(Case::CaseModel::PiStation));
     list.push_back(Case::Create(Case::CaseModel::ArgonOne));
@@ -144,7 +149,7 @@ std::vector<Case> Case::SupportedManualCases()
     list.push_back(Case::Create(Case::CaseModel::RaspberryPiTouchDisplay));
     list.push_back(Case::Create(Case::CaseModel::None));
   }
-  if (Board::Instance().GetBoardType() == BoardType::Pi3plus || Board::Instance().GetBoardType() == BoardType::Pi3)
+  else if (Board::Instance().GetBoardType() == BoardType::Pi3plus || Board::Instance().GetBoardType() == BoardType::Pi3)
   {
     list.push_back(Case::Create(Case::CaseModel::MegaPiCase));
     list.push_back(Case::Create(Case::CaseModel::SuperPiCase));

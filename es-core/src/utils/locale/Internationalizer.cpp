@@ -129,11 +129,7 @@ bool Internationalizer::BuildStringIndexes()
     {
       // Check consistency
       int translatedSplit = 0;
-      if (!HasPlural(translated, transLength, translatedSplit))
-      {
-        { LOG(LogError) << "[Locale] Inconsistent plural form in .mo file. Ignored"; }
-        return false;
-      }
+      bool hasPluralValues = HasPlural(translated, transLength, translatedSplit);
 
       // Add singular form
       int h1 = 0, h2 = 0;
@@ -142,11 +138,21 @@ bool Internationalizer::BuildStringIndexes()
 
       // Add plural form
       key += keySplit + 1; keyLength -= keySplit + 1;
-      translated += translatedSplit + 1; transLength -= translatedSplit + 1;
-      if (transLength > 0)
+      if (hasPluralValues)
       {
+        translated += translatedSplit + 1; transLength -= translatedSplit + 1;
+        if (transLength > 0)
+        {
+          Hash(key, keyLength, h1, h2);
+          sStrings.push_back({ key, translated, keyLength, transLength, h1, h2 });
+        }
+      }
+      else
+      {
+        { LOG(LogWarning) << "[Locale] Inconsistent plural form in .mo file."; }
+        // Plural key but no plural form
         Hash(key, keyLength, h1, h2);
-        sStrings.push_back({ key, translated, keyLength, transLength, h1, h2 });
+        sStrings.push_back({key, translated, keyLength, translatedSplit, h1, h2 });
       }
     }
     else

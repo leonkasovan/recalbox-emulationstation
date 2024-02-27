@@ -18,10 +18,26 @@ class SystemManager : private INoCopy // No copy allowed
                     , public IThreadPoolWorkerInterface<SystemData*, bool> // Multi-threaded system unloading
                     , public IThreadPoolWorkerInterface<VirtualSystemDescriptor, VirtualSystemResult> // Multi-threaded system unloading
                     , public IMountMonitorNotifications
+                    , public ISlowSystemOperation
 {
   public:
+    //! Requested Visibility
+    enum class Visibility
+    {
+      Show,          //! Show the system
+      ShowAndSelect, //! Show and select the system
+      Hide,          //! Hide the system
+    };
+
     //! Convenient alias for System list
     typedef Array<SystemData*> List;
+    //! Convenient alias for SystemDescriptor list
+    typedef std::vector<SystemDescriptor> DescriptorList;
+
+    //! Arcade manufacturer virtual system's name prefix
+    static constexpr const char* sArcadeManufacturerPrefix = "arcade-manufacturer-";
+    //! Genre virtual system's name prefix
+    static constexpr const char* sGenrePrefix = "genre-";
 
     //! Favorite system internal name
     static constexpr const char* sFavoriteSystemShortName = "favorites";
@@ -93,8 +109,6 @@ class SystemManager : private INoCopy // No copy allowed
     Path::PathList mMountPoints;
     //! Mount point monitoring
     MountMonitor mMountPointMonitoring;
-    //! Emulator manager
-    EmulatorManager mEmulatorManager;
     //! Emulator manager guard
     Mutex mEmulatorGuard;
 
@@ -226,11 +240,6 @@ class SystemManager : private INoCopy // No copy allowed
     SystemData* CreateArcadeManufacturersSystem(const String& manufacturer);
 
     /*!
-     * @brief Manager hiden/shown arcade system, regarding arcade virtual system configuration
-     */
-    void ManageArcadeVirtualSystem();
-
-    /*!
      * @brief Manager hiden ports' sub-systems
      */
     void ManagePortsVirtualSystem();
@@ -241,7 +250,7 @@ class SystemManager : private INoCopy // No copy allowed
      * @param system System to initialize
      * @param initializeOnly True to initialize the system without populating it first. False to populate and initialize
      */
-    void InitializeSystem(SystemData* system, bool initializeOnly);
+    void InitializeSystem(SystemData* system);
 
     /*!
      * @brief Top level virtual system populate - load theme, then set initialized
@@ -463,8 +472,22 @@ class SystemManager : private INoCopy // No copy allowed
      * @param addedSystems Added systems or nullptr
      * @param removedSystems Removed system or nullptr
      * @param modifiedSystems Modified system or nullptr
+     * @param autoSelectMonoSystem If the list contains only one system, tell the GUI to move onto this system)
      */
-    void ApplySystemChanges(List* addedSystems, List* removedSystems, List* modifiedSystems);
+    void ApplySystemChanges(List* addedSystems, List* removedSystems, List* modifiedSystems, bool autoSelectMonoSystem);
+
+    /*!
+     * @brief Check the given list, looking for uninitialized systems
+     * @param list List to check
+     * @return True if at least one systm is not initialized, false if they are all initialized
+     */
+    static bool ContainsUnitializedSystem(const List& list);
+
+    /*!
+     * @brief Check the given list and remove system that must stay hidden
+     * @param list List to filter
+     */
+    static void RemoveAlwaysHiddenSystems(List& list);
 
     /*
      * Log facilities
@@ -475,13 +498,22 @@ class SystemManager : private INoCopy // No copy allowed
     static void LogSystemGameAdded(SystemData* system, FileData* game) { LOG(LogWarning) << "[SystemManager] Metadata changed. Add " << game->Name() << " into " << system->FullName(); }
     static void LogSystemGameRemoved(SystemData* system, FileData* game) { LOG(LogWarning) << "[SystemManager] Metadata changed. Remove " << game->Name() << " from " << system->FullName(); }
 
+    /*
+     * ISlowSystemOperation implementation
+     */
+
+    //! Populate operation
+    void SlowPopulateExecute(const List& listToPopulate) override;
+
+    //! Completed
+    void SlowPopulateCompleted(const List& listToPopulate, bool autoSelectMonoSystem) override;
+
   public:
     /*!
      * @brief constructor
      */
     explicit SystemManager(IRomFolderChangeNotification& interface, HashSet<String>& watcherIgnoredFiles)
       : mMountPointMonitoring(this)
-      , mFastSearchSeries()
       , mFastSearchCacheHash(0)
       , mProgressInterface(nullptr)
       , mLoadingPhaseInterface(nullptr)
@@ -544,6 +576,20 @@ class SystemManager : private INoCopy // No copy allowed
     SystemData* VirtualSystemByType(VirtualSystemType type);
 
     /*!
+     * @brief Lookup arcade manufacturer virtual system by name
+     * @param name Short name w/o prefix
+     * @return System reference - never null
+     */
+    SystemData* VirtualArcadeManufacturerSystemByName(const String& name);
+
+    /*!
+     * @brief Lookup genre virtual system by genre enumeration
+     * * @param genre Genre type
+     * @return System reference - never null
+     */
+    SystemData* VirtualGenreSystemByGenre(GameGenres genre);
+
+    /*!
      * @brief Get the first non-empty system
      * @return First non empty system or null if all systems are empty
      */
@@ -559,7 +605,7 @@ class SystemManager : private INoCopy // No copy allowed
     /*!
      * @brief Update gamelist that contain modified game metadata
      */
-    void UpdateAllSystems();
+    void UpdateAllGameLists();
 
     /*!
      * @brief Delete all systems and all sub-objects
@@ -576,10 +622,35 @@ class SystemManager : private INoCopy // No copy allowed
     bool LoadSystemConfigurations(FileNotifier& gamelistWatcher, bool ForeReload, bool portableSystem);
 
     /*!
+     * @brief Load a single system to get mgame metadata in autorun mode
+     * @param UUID UUID of system to load
+     */
+    bool LoadSingleSystemConfigurations(const String& UUID);
+
+    /*!
+     * @brief Load akk systems from the descriptor list
+     * @param systemList System to load
+     * @param gamelistWatcher FileNotifier to fill in with gamelist path
+     * @param portableSystem true if the current board is a portable system and does not need lightgun
+     * @param novirtuals True to bypass virtual system loading (only useful for fast system loading in autorun mode)
+     */
+    bool LoadSystems(const DescriptorList& systemList, FileNotifier* gamelistWatcher, bool portableSystem, bool novirtuals);
+
+    /*!
      * @brief Build all virtual systems
+     * @param systemList true system list to load/reload
      * @param portableSystem true if the current board is a portable system and does not need lightgun
      */
-    void LoadVirtualSystemConfigurations(bool portableSystem);
+    void LoadVirtualSystems(const DescriptorList& systemList, bool portableSystem);
+
+    /*!
+     * @brief Check if a Virtual system identified by the given type needs to be refreshed according to the given list
+     * of loaded/reloaded systems
+     * @param systemList System list
+     * @param type Virtual system type
+     * @return True if the given Virtual system needs to be refreshed, false otherwise
+     */
+    [[nodiscard]] bool VirtualSystemNeedRefresh(const DescriptorList& systemList, VirtualSystemType type) const;
 
     /*!
      * @brief Set file watching on all gamelist so that the frontend may know if they have been modified from elsewhere
@@ -612,23 +683,6 @@ class SystemManager : private INoCopy // No copy allowed
     [[nodiscard]] const List& VisibleSystemList() const { return mVisibleSystems; }
 
     /*!
-     * @brief Update last-played system with the given game
-     * @param game Last played game
-     */
-    void UpdateLastPlayedSystem(FileData& game);
-
-    /*!
-     * @brief Get Last Played system
-     * @return Last played system or nullptr if it does not exist
-     */
-    SystemData* LastPlayedSystem()
-    {
-      int index = getVisibleSystemIndex(sLastPlayedSystemShortName);
-      if (index < 0) return nullptr;
-      return mVisibleSystems[index];
-    }
-
-    /*!
      * @brief Get next system to the given system
      * @param to Reference system
      * @return Next system
@@ -651,9 +705,6 @@ class SystemManager : private INoCopy // No copy allowed
       if (index < 0) return mVisibleSystems[0];
       return mVisibleSystems[(--index + mVisibleSystems.Count()) % mVisibleSystems.Count()];
     }
-
-    //! Get emulator manager
-    [[nodiscard]] const EmulatorManager& Emulators() const { return mEmulatorManager; }
 
     /*!
      * @brief Search games from text
@@ -717,4 +768,93 @@ class SystemManager : private INoCopy // No copy allowed
      * @param deleted True if the game has been deleted
      */
     void UpdateSystemsOnGameChange(FileData* target, MetadataType changes, bool deleted);
+
+    /*!
+     * @brief Top level filter component has been updated
+     * All systems must check if they are becoming visible or invisible or just updated
+     */
+    [[nodiscard]] bool UpdatedTopLevelFilter();
+
+    /*!
+     * @brief Show or Hide the given system.Initialize the given system ir required, then make is visible!
+     * This method is a high level method that make the move in/out the Visible list, initialize the system if required
+     * and call the SystemNotifier
+     * @param system System to change visibility
+     * @param show Tru to show the system, false to hide
+     */
+    void UpdateSystemsVisibility(SystemData* system, Visibility visibility);
+
+    /*!
+     * @brief Show or Hide the given virtual system. Initialize the given system ir required, then make is visible!
+     * This method is a high level method that make the move in/out the Visible list, initialize the system if required
+     * and call the SystemNotifier
+     * @param type Virtual system to change visibility
+     * @param show Tru to show the system, false to hide
+     */
+    void UpdateVirtualSystemsVisibility(VirtualSystemType type, Visibility visibility)
+    {
+      UpdateSystemsVisibility(VirtualSystemByType(type), visibility);
+    }
+
+    /*!
+     * @brief Show or Hide the given arcade manufacturer virtual system. Initialize the given system ir required, then make is visible!
+     * This method is a high level method that make the move in/out the Visible list, initialize the system if required
+     * and call the SystemNotifier
+     * @param name arcade manufacturer virtual system name to change visibility
+     * @param show Tru to show the system, false to hide
+     */
+    void UpdateVirtualArcadeManufacturerSystemsVisibility(const String& name, Visibility visibility)
+    {
+      UpdateSystemsVisibility(VirtualArcadeManufacturerSystemByName(name), visibility);
+    }
+
+    /*!
+     * @brief Show or Hide the given genre virtual system. Initialize the given system ir required, then make is visible!
+     * This method is a high level method that make the move in/out the Visible list, initialize the system if required
+     * and call the SystemNotifier
+     * @param genre Virtual genre system to change visibility
+     * @param show Tru to show the system, false to hide
+     */
+    void UpdateVirtualGenreSystemsVisibility(GameGenres genre, Visibility visibility)
+    {
+      UpdateSystemsVisibility(VirtualGenreSystemByGenre(genre), visibility);
+    }
+
+    /*!
+     * @brief Manager hiden/shown arcade system, regarding arcade virtual system configuration
+     * @param startup If true, the method make required system visible/invisible without calling
+     * the SystemInterfaceNotifier on added/removed systems from the visible list
+     */
+    void ManageArcadeVirtualSystem(bool startup = false);
+
+    /*!
+     * @brief Get system name from the given arcade manufacturer name
+     * @param manufacturer Manufacturer name
+     * @return System name
+     */
+    static String BuildArcadeManufacturerSystemName(const String& manufacturer)
+    {
+      return String(sArcadeManufacturerPrefix).Append(manufacturer).Replace('\\', '-');
+    }
+
+    /*!
+     * @brief Get system name from the given genre
+     * @param genre Game genre
+     * @return System name
+     */
+    static String BuildGenreSystemName(GameGenres genre)
+    {
+      return String(sGenrePrefix).Append(Genres::GetShortName(genre));
+    }
+
+    /*!
+     * @brief Get absolute system index from the all system list
+     * this index must not change whether there are shown/hidden/loaded/unloaded systems before or after
+     * @param system System to get index from
+     * @return System index or -1
+     */
+    int SystemAbsoluteIndex(SystemData* const system)
+    {
+      return mAllSystems.IndexOf(system);
+    }
 };

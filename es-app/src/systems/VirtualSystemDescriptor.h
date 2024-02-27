@@ -13,7 +13,7 @@ struct VirtualSystemDescriptor
     //! Simple type descriptor
     explicit VirtualSystemDescriptor(VirtualSystemType type, int index)
       : mType(type)
-      , mArcadeDriver()
+      , mArcadeManufacturer()
       , mGenreData(GameGenres::None)
       , mIndex(index)
     {}
@@ -21,7 +21,7 @@ struct VirtualSystemDescriptor
     //! Arcade manufacturer descriptor
     explicit VirtualSystemDescriptor(const String& manufacturer, int index)
       : mType(VirtualSystemType::ArcadeManufacturers)
-      , mArcadeDriver(manufacturer)
+      , mArcadeManufacturer(manufacturer)
       , mGenreData(GameGenres::None)
       , mIndex(index)
     {}
@@ -29,7 +29,6 @@ struct VirtualSystemDescriptor
     //! Genre descriptor
     explicit VirtualSystemDescriptor(GameGenres genre, int index)
       : mType(VirtualSystemType::Genre)
-      , mArcadeDriver()
       , mGenreData(genre)
       , mIndex(index)
     {}
@@ -37,7 +36,6 @@ struct VirtualSystemDescriptor
     // Default constructor for thread pool
     VirtualSystemDescriptor()
       : mType(VirtualSystemType::Favorites)
-      , mArcadeDriver()
       , mGenreData(GameGenres::None)
       , mIndex(0)
     {}
@@ -53,16 +51,16 @@ struct VirtualSystemDescriptor
 
     //! Get type
     [[nodiscard]] VirtualSystemType Type() const { return mType; }
-    //! Get arcade driver
-    [[nodiscard]] const String& ArcadeDriver() const { return mArcadeDriver; }
+    //! Get arcade manufacturer
+    [[nodiscard]] const String& ArcadeManufacturer() const { return mArcadeManufacturer; }
     //! Get genre
     [[nodiscard]] GameGenres Genre() const { return mGenreData; }
     //! Get genre
     [[nodiscard]] int Index() const { return mIndex; }
 
   private:
-    VirtualSystemType mType; //!< Type
-    String mArcadeDriver;    //!< Arcade manufacturers
-    GameGenres mGenreData;   //!< Genre for ganre systems
-    int mIndex;              //!< Virtual system index
+    VirtualSystemType mType;    //!< Type
+    String mArcadeManufacturer; //!< Arcade manufacturers
+    GameGenres mGenreData;      //!< Genre for ganre systems
+    int mIndex;                 //!< Virtual system index
 };

@@ -7,10 +7,11 @@
 #include <utils/locale/LocaleHelper.h>
 #include <MainRunner.h>
 
-GuiDownloader::GuiDownloader(WindowManager& window, SystemData& system)
+GuiDownloader::GuiDownloader(WindowManager& window, SystemData& system, SystemManager& systemManager)
   : Gui(window)
   , mBackground(window, Path(":/frame.png"))
   , mGrid(window, Vector2i(3, 4))
+  , mSystemManager(systemManager)
 {
   addChild(&mBackground);
   addChild(&mGrid);
@@ -130,14 +131,10 @@ void GuiDownloader::UpdateETAText(const String& text)
 
 void GuiDownloader::DownloadComplete(SystemData& system, bool aborted)
 {
-  if (!aborted)
-  {
-    ViewController& vc = ViewController::Instance();
-    vc.InvalidateGamelist(&system);
-    vc.getSystemListView().manageSystemsList();
-    vc.getSystemListView().setSelectedName(system.Name());
-  }
   mWindow.CloseAll();
+
+  if (!aborted)
+    mSystemManager.UpdateSystemsVisibility(&system, SystemManager::Visibility::ShowAndSelect);
 }
 
 void GuiDownloader::UpdateTitleText(const String& text)

@@ -426,6 +426,7 @@ void PulseAudioController::AddSpecialPlaybacks(IAudioController::DeviceList& lis
     case BoardType::Pi3plus:
     case BoardType::Pi4:
     case BoardType::Pi400:
+    case BoardType::Pi5:
     case BoardType::UnknownPi:
     case BoardType::PCx86:
     case BoardType::PCx64:
@@ -625,6 +626,8 @@ String PulseAudioController::GetActivePlaybackName()
   {
     case BoardType::OdroidAdvanceGo:
     case BoardType::OdroidAdvanceGoSuper:
+    case BoardType::RG351V:
+    case BoardType::RG351P:
     case BoardType::RG353P:
     case BoardType::RG353V:
     case BoardType::RG353M:
@@ -639,6 +642,7 @@ String PulseAudioController::GetActivePlaybackName()
     case BoardType::Pi3plus:
     case BoardType::Pi4:
     case BoardType::Pi400:
+    case BoardType::Pi5:
     case BoardType::UnknownPi:
     case BoardType::PCx86:
     case BoardType::PCx64:
@@ -678,7 +682,8 @@ String PulseAudioController::AdjustSpecialPlayback(const String& originalPlaybac
 
   switch(Board::Instance().GetBoardType())
   {
-    case BoardType::RG353V:
+    case BoardType::RG351V:
+    case BoardType::RG351P:
     case BoardType::OdroidAdvanceGo:
     case BoardType::OdroidAdvanceGoSuper:
     {
@@ -695,10 +700,12 @@ String PulseAudioController::AdjustSpecialPlayback(const String& originalPlaybac
       else { LOG(LogError) << "[PulseAudio] Unreconized output: " << originalPlaybackName; }
       break;
     }
+    case BoardType::RG353V:
     case BoardType::RG353P:
     case BoardType::RG353M:
     case BoardType::RG503:
     {
+      // we force headphone output so that rg353m can be switched to spk by the software after the init/detection of headphone
       if (system("amixer sset 'Playback Path' HP") != 0)
       { LOG(LogError) << "[PulseAudio] Error setting playback path"; }
       break;
@@ -713,6 +720,7 @@ String PulseAudioController::AdjustSpecialPlayback(const String& originalPlaybac
     case BoardType::Pi3plus:
     case BoardType::Pi4:
     case BoardType::Pi400:
+    case BoardType::Pi5:
     case BoardType::UnknownPi:
     case BoardType::PCx86:
     case BoardType::PCx64:
@@ -1097,12 +1105,15 @@ String PulseAudioController::GetCardDescription(const pa_card_info& info)
     case BoardType::Pi3plus:
     case BoardType::Pi4:
     case BoardType::Pi400:
+    case BoardType::Pi5:
     case BoardType::UnknownPi:
     {
       result = cardName;
       result.Remove("bcm2835").Replace("vc4-hdmi", "HDMI");
       break;
     }
+    case BoardType::RG351V:
+    case BoardType::RG351P:
     case BoardType::OdroidAdvanceGo:
     case BoardType::OdroidAdvanceGoSuper:
     case BoardType::RG353P:
@@ -1149,7 +1160,10 @@ String PulseAudioController::GetPortDescription(const pa_sink_port_info& info, A
     case BoardType::Pi3plus:
     case BoardType::Pi4:
     case BoardType::Pi400:
+    case BoardType::Pi5:
     case BoardType::UnknownPi:
+    case BoardType::RG351V:
+    case BoardType::RG351P:
     case BoardType::OdroidAdvanceGo:
     case BoardType::OdroidAdvanceGoSuper:
     case BoardType::RG353P:
@@ -1183,13 +1197,16 @@ String PulseAudioController::GetPortDescription(const pa_card_port_info& info, A
     case BoardType::Pi3plus:
     case BoardType::Pi4:
     case BoardType::Pi400:
+    case BoardType::Pi5:
     case BoardType::UnknownPi:
+    case BoardType::RG351P:
     case BoardType::OdroidAdvanceGo:
     case BoardType::OdroidAdvanceGoSuper:
     case BoardType::RG353P:
     case BoardType::RG353V:
     case BoardType::RG353M:
     case BoardType::RG503:
+    case BoardType::RG351V:
     case BoardType::PCx86:
     case BoardType::PCx64:
     case BoardType::UndetectedYet:
@@ -1233,4 +1250,12 @@ void PulseAudioController::ReceiveSyncMessage()
     mNotificationInterface->NotifyAudioChange();
 }
 
+void PulseAudioController::SetOutputPort(String portName)
+{
+  pa_operation* op = pa_context_set_sink_port_by_name(mPulseAudioContext, mServerInfo.DefaultSinkName.c_str(), portName.c_str(), SetPortCallback, this);
+  // Wait for result
+  mSignal.WaitSignal(sTimeOut);
+  // Release
+  pa_operation_unref(op);
+}
 #pragma clang diagnostic pop

@@ -16,8 +16,6 @@ MetadataStringHolder MetadataDescriptor::sCoreHolder(2 << 10, 1 << 10);
 MetadataStringHolder MetadataDescriptor::sRatioHolder(1 << 10, 1 << 10);
 MetadataStringHolder MetadataDescriptor::sPathHolder(64 << 10, 32 << 10);
 MetadataStringHolder MetadataDescriptor::sFileHolder(128 << 10, 32 << 10);
-MetadataStringHolder MetadataDescriptor::sLastPatchPathHolder(2 << 10, 1 << 10);
-MetadataStringHolder MetadataDescriptor::sLastPatchFileHolder(2 << 10, 1 << 10);
 
 #ifdef _METADATA_STATS_
 int MetadataDescriptor::LivingClasses = 0;
@@ -56,8 +54,9 @@ const MetadataFieldDescriptor* MetadataDescriptor::GetMetadataFieldDescriptors(I
         MetadataFieldDescriptor("playcount"  , "0"    , _("Play count")  , _("enter number of times played"), MetadataType::PlayCount   ,MetadataFieldDescriptor::DataType::Int    , MetadataFieldDescriptor::EditableType::None   , &MetadataDescriptor::IsDefaultPlayCount      , &MetadataDescriptor::PlayCountAsString   , &MetadataDescriptor::SetPlayCountAsString    , true , false),
         MetadataFieldDescriptor("lastplayed" , "0"    , _("Last played") , _("enter last played date")      , MetadataType::LastPlayed  ,MetadataFieldDescriptor::DataType::Date   , MetadataFieldDescriptor::EditableType::None   , &MetadataDescriptor::IsDefaultLastPlayedEpoc , &MetadataDescriptor::LastPlayedAsString  , &MetadataDescriptor::SetLastPlayedAsString   , true , false),
         MetadataFieldDescriptor("hash"       , "0"    , _("Rom Crc32")   , _("enter rom crc32")             , MetadataType::Crc32       ,MetadataFieldDescriptor::DataType::Crc32  , MetadataFieldDescriptor::EditableType::None   , &MetadataDescriptor::IsDefaultRomCrc32       , &MetadataDescriptor::RomCrc32AsString    , &MetadataDescriptor::SetRomCrc32AsString     , true , false),
-        MetadataFieldDescriptor("lastPatch"  , ""     , _("Last Patch")  , _("enter patch")                 , MetadataType::LastPatch   , MetadataFieldDescriptor::DataType::Path  , MetadataFieldDescriptor::EditableType::None   , &MetadataDescriptor::IsDefaultLastPath       , &MetadataDescriptor::LastPatchAsString   , &MetadataDescriptor::SetLastPatchAsString    , true , false),
+        MetadataFieldDescriptor("lastPatch"  , ""     , _("Last Patch")  , _("enter patch")                 , MetadataType::LastPatch   ,MetadataFieldDescriptor::DataType::Path   , MetadataFieldDescriptor::EditableType::None   , &MetadataDescriptor::IsDefaultLastPath       , &MetadataDescriptor::LastPatchAsString   , &MetadataDescriptor::SetLastPatchAsString    , true , false),
         MetadataFieldDescriptor("rotation"   , "None" , _("Rotation")    , _("enter rotation")              , MetadataType::Rotation    ,MetadataFieldDescriptor::DataType::Int    , MetadataFieldDescriptor::EditableType::Switch , &MetadataDescriptor::IsDefaultRotation       , &MetadataDescriptor::RotationAsString    , &MetadataDescriptor::SetRotationAsString     , false, false),
+        MetadataFieldDescriptor("timeplayed" , "0"    , _("TimePlayed")  , _("enter TimePlayed")            , MetadataType::TimePlayed  , MetadataFieldDescriptor::DataType::Int   , MetadataFieldDescriptor::EditableType::None   , &MetadataDescriptor::IsDefaultTimePlayed     , &MetadataDescriptor::TimePlayedAsString  , &MetadataDescriptor::SetTimePlayedAsString   , false, false),
       };
 
       count = sizeof(sGameMetadataDescriptors) / sizeof(MetadataFieldDescriptor);
@@ -137,8 +136,8 @@ String MetadataDescriptor::IntToRange(int range)
 bool MetadataDescriptor::RangeToInt(const String& range, int& to)
 {
   // max+ (min+)
-  int p = (int)range.find('+');
-  if (p != (int)String::npos)
+  int p = range.Find('+');
+  if (p >= 0)
   {
     if (!StringToInt(range, p, 0, '+')) return false;
     to = (p << 16) + 0xFFFF;
@@ -146,8 +145,8 @@ bool MetadataDescriptor::RangeToInt(const String& range, int& to)
   }
 
   // max-max
-  p = (int)range.find('-');
-  if (p == (int)String::npos)
+  p = range.Find('-');
+  if (p < 0)
   {
     if (!StringToInt(range, p)) return false;
     to = (p << 16) + p;
@@ -378,8 +377,7 @@ void MetadataDescriptor::CleanupHolders()
   LOG(LogDebug) << "[MetadataDescriptor] Emulator storage: "    << sEmulatorHolder.StorageSize()      << " - object count: " << sEmulatorHolder.ObjectCount()   ;
   LOG(LogDebug) << "[MetadataDescriptor] Path storage: "        << sPathHolder.StorageSize()          << " - object count: " << sPathHolder.ObjectCount()       ;
   LOG(LogDebug) << "[MetadataDescriptor] File storage: "        << sFileHolder.StorageSize()          << " - object count: " << sFileHolder.ObjectCount()       ;
-  LOG(LogDebug) << "[MetadataDescriptor] Patch Path storage: "  << sLastPatchPathHolder.StorageSize() << " - object count: " << sLastPatchPathHolder.ObjectCount()       ;
-  LOG(LogDebug) << "[MetadataDescriptor] Patcn File storage: "  << sLastPatchFileHolder.StorageSize() << " - object count: " << sLastPatchFileHolder.ObjectCount()       ;
+
   sNameHolder.Finalize();
   sDescriptionHolder.Finalize();
   sPublisherHolder.Finalize();
@@ -390,6 +388,4 @@ void MetadataDescriptor::CleanupHolders()
   sEmulatorHolder.Finalize();
   sPathHolder.Finalize();
   sFileHolder.Finalize();
-  sLastPatchPathHolder.Finalize();
-  sLastPatchFileHolder.Finalize();
 }

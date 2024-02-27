@@ -13,9 +13,6 @@
 class EmulatorManager : public INoCopy
 {
   private:
-    //! System to emulator/core list
-    HashMap<String, const EmulatorList*> mSystemEmulators;
-
     /*!
      * @brief Get an unique key from the given system
      * @param system System
@@ -30,7 +27,7 @@ class EmulatorManager : public INoCopy
      * @param core Core name to check
      * @return True if both emulator/core exist for the given system, false otherwise
      */
-    [[nodiscard]] bool CheckEmulatorAndCore(const SystemData& system, const String& emulator, const String& core) const;
+    [[nodiscard]] static bool CheckEmulatorAndCore(const SystemData& system, const String& emulator, const String& core) ;
 
     /*!
      * @brief Try to guess either the emulator or the core name for the given system, using the following algorithm:
@@ -43,7 +40,7 @@ class EmulatorManager : public INoCopy
      * @param core Core name or empty
      * @return True if either core or emulator has been guessed, false otherwise
      */
-    bool GuessEmulatorAndCore(const SystemData& system, String& emulator, String& core) const;
+    static bool GuessEmulatorAndCore(const SystemData& system, String& emulator, String& core) ;
 
     /*!
      * @brief Get default emulator/core for the given system
@@ -52,7 +49,7 @@ class EmulatorManager : public INoCopy
      * @param core Filled in Core name
      * @return True if emulator and core have been filled, false otherwise (error, non-existing system, ...)
      */
-    bool GetSystemDefaultEmulator(const SystemData& system, String& emulator, String& core) const;
+    static bool GetSystemDefaultEmulator(const SystemData& system, String& emulator, String& core) ;
 
     /*!
      * @brief Try to override emulator/core from values from recalbox.conf file
@@ -60,7 +57,7 @@ class EmulatorManager : public INoCopy
      * @param emulator Emulator name to override if '<system>.emulator=value' exists in the configuration file
      * @param core Core name to override if '<system>.core=value' exists in the configuration file
      */
-    void GetEmulatorFromConfigFile(const SystemData& system, String& emulator, String& core) const;
+    static void GetEmulatorFromConfigFile(const SystemData& system, String& emulator, String& core);
 
     /*!
      * @brief Try to get emulator/core override from the given game
@@ -68,31 +65,24 @@ class EmulatorManager : public INoCopy
      * @param emulator Emulator name to override with the one from game's metadata if non empty
      * @param core Core name to override with the one from game's metadata if non empty
      */
-    void GetEmulatorFromGamelist(const FileData& game, String& emulator, String& core) const;
+    static void GetEmulatorFromGamelist(const FileData& game, String& emulator, String& core);
+
+    /*!
+     * @brief Try to guess emulator/core from known system subfolders
+     * @param game Game
+     * @param emulator Emulator name to override with the one from game's metadata if non empty
+     * @param core Core name to override with the one from game's metadata if non empty
+     */
+    static void GetEmulatorFromSubfolder(const FileData& game, String& emulator, String& core);
 
     /*!
      * @brief Try to get emulator/core override from overrides files (.recalbox.conf) in the rom path
      * @param game Game from whitch to get rom path
      * @param emulator Emulator name to override with the one(s) from override files if they exists
      * @param core Core name to override with the one(s) from override files if they exists
+     * @return True if the emulator/core have been overriden, false otherwise
      */
-    void GetEmulatorFromOverride(const FileData& game, String& emulator, String& core) const;
-
-    /*!
-     * @brief Add a new emulator list for the given system
-     * @param system System
-     * @param list Emulator (and core) list
-     */
-    void AddEmulatorList(const SystemData& system)
-    {
-      String key = KeyFrom(system);
-      if (mSystemEmulators.contains(key))
-      {
-        { LOG(LogError) << "[Emulator] Fatal error: You cannot define 2 systems with the same fullname and the same platforms! ABORTING."; }
-        exit(1);
-      }
-      mSystemEmulators.insert(key, &system.Emulators());
-    }
+    static bool GetEmulatorFromOverride(const FileData& game, String& emulator, String& core);
 
     /*!
      * @brief Patch name if required (example: libretro-duckstation renamed libretro-swanstation in 7.2.1)
@@ -113,7 +103,16 @@ class EmulatorManager : public INoCopy
      * @param core Filled in Core name
      * @return True if emulator and core have been filled, false otherwise (error, non-existing system, ...)
      */
-    bool GetDefaultEmulator(const SystemData& system, String& emulator, String& core) const;
+    static bool GetDefaultEmulator(const SystemData& system, String& emulator, String& core) ;
+
+    /*!
+     * @brief Get system emulator/core, including system configuration
+     * @param system System to get default emulator/core from
+     * @param emulator Filled in Emulator name
+     * @param core Filled in Core name
+     * @return True if emulator and core have been filled, false otherwise (error, non-existing system, ...)
+     */
+    static bool GetSystemEmulator(const SystemData& system, String& emulator, String& core);
 
     /*!
      * @brief Get final emulator/core names used to run the given game
@@ -123,7 +122,21 @@ class EmulatorManager : public INoCopy
      * @param core Core name
      * @return True if emulator/core have been filled properly, false otherwise (error, non-existing system, ...)
      */
-    bool GetGameEmulator(const FileData& game, String& emulator, String& core) const;
+    static bool GetGameEmulatorOverriden(const FileData& game, String& emulator, String& core, bool& byOverride);
+
+    /*!
+     * @brief Get final emulator/core names used to run the given game
+     * this method explore all config files and override to find out final names
+     * @param game Game to get emulator/core for
+     * @param emulator Emulator name
+     * @param core Core name
+     * @return True if emulator/core have been filled properly, false otherwise (error, non-existing system, ...)
+     */
+    static bool GetGameEmulator(const FileData& game, String& emulator, String& core)
+    {
+      bool dummy;
+      return GetGameEmulatorOverriden(game, emulator, core, dummy);
+    }
 
     /*!
      * @brief Get final emulator/core names used to run the given game
@@ -131,14 +144,14 @@ class EmulatorManager : public INoCopy
      * @param game Game to get emulator/core for
      * @return Emulator/Core holder. May be invalid.
      */
-    [[nodiscard]] EmulatorData GetGameEmulator(const FileData& game) const;
+    [[nodiscard]] static EmulatorData GetGameEmulator(const FileData& game) ;
 
     /*!
      * @brief Get emulator list for the given system. The first item is the default emulator
      * @param system System to get emulator list from
      * @return Emulator list
      */
-    [[nodiscard]] String::List GetEmulators(const SystemData& system) const;
+    [[nodiscard]] static String::List GetEmulators(const SystemData& system) ;
 
     /*!
      * @brief Get core list for the given system and the given emulator
@@ -146,12 +159,12 @@ class EmulatorManager : public INoCopy
      * @param emulator Emulator ro get core list from
      * @return Core list
      */
-    [[nodiscard]] String::List GetCores(const SystemData& system, const String& emulator) const;
+    [[nodiscard]] static String::List GetCores(const SystemData& system, const String& emulator) ;
 
     /*!
      * @brief Check if the user had overloaded the emulator or core in any configuration
      * @param game FileData to check against emulator/code
      * @return True if any of emulator/core has been overloaded in any config file
     */
-    [[nodiscard]] bool ConfigOverloaded(const FileData& game) const;
+    [[nodiscard]] static bool ConfigOverloaded(const FileData& game) ;
 };

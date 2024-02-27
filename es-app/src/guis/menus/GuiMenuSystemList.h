@@ -26,11 +26,20 @@ class GuiMenuSystemList : public GuiMenuBase
     //! System manager
     SystemManager& mSystemManager;
 
+    // Submenu list
+    HashMap<SystemData*, std::shared_ptr<TextComponent>> mMenus;
+
     /*
      * IGuiMenuBase implementation
      */
 
     void SubMenuSelected(int id) override;
+
+    /*
+     * Component Override
+     */
+
+    void onShow() override;
 };
 
 

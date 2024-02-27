@@ -20,7 +20,10 @@ class SplashView : public Gui
     int mSystemLoaded;
 
     //! RGB Dual identified?
-    bool mIsRGBDual;
+    bool mIsRecalboxRGBHat;
+
+    //! RGB JAMMA identified?
+    bool mIsRGBJamma;
 
   public:
     /*!

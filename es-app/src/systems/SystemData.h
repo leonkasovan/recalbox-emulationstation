@@ -193,7 +193,7 @@ class SystemData : private INoCopy
     [[nodiscard]] Path getThemePath() const;
 
     [[nodiscard]] bool HasGame() const;
-    [[nodiscard]] bool HasVisibleGame(bool forceTateOnly = false) const;
+    [[nodiscard]] bool HasVisibleGame() const;
 
     /*!
     * @brief Check if system has no only RO games
@@ -227,7 +227,11 @@ class SystemData : private INoCopy
     //! Is this system the "Ports" system?ScreenShots
     [[nodiscard]] bool IsPorts() const;
 
+    //! Is this the Screenshots system
     [[nodiscard]] bool IsScreenshots() const;
+
+    //! Is this the Last Played system
+    [[nodiscard]] bool IsLastPlayed() const;
 
     //! Is this system virtual?
     [[nodiscard]] bool IsVirtual() const;

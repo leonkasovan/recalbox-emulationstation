@@ -12,38 +12,37 @@
 class ArcadeDatabase
 {
   public:
-    //! Driver index list
+    //! Manufacturer index list
     typedef Array<int> IndexList;
 
-    //! Dual driver list
-    struct DriverLists
+    //! Dual manufacturer list
+    struct ManufacturerLists
     {
-      String::List mLimited; //!< Limited driver list (most important limited list, ordered by game count)
-      String::List mRaw;     //!< Raw driver list (all driver, ordered by game count)
-      DriverLists(String::List limited, String::List raw) : mLimited(std::move(limited)), mRaw(std::move(raw)) {}
-      DriverLists() = default;
+      String::List mLimited; //!< Limited manufacturer list (most important limited list, ordered by game count)
+      String::List mRaw;     //!< Raw manufacturer list (all manufacturers, ordered by game count)
+      ManufacturerLists(String::List limited, String::List raw) : mLimited(std::move(limited)), mRaw(std::move(raw)) {}
+      ManufacturerLists() = default;
     };
 
     /*!
-     * @brief Micro-structure that hold a driver name and an index
+     * @brief Micro-structure that hold a manufacturer name and an index
      */
-    struct Driver
+    struct Manufacturer
     {
       int Index;
       String Name;
-      Driver(int index, const String& name) : Index(index), Name(name) {}
+      Manufacturer(int index, const String& name) : Index(index), Name(name) {}
     };
 
     /*!
      * @brief Constructor
-     * @param drivers Final drivers
+     * @param rawManufacturers Final raw manufacturers
+     * @param limitedManufacturers Final limited manufacturers
      * @param games Arcade game spec list
-     * @param lookup Lookup map
      */
-    ArcadeDatabase(String::List&& rawDrivers, String::List&& limitedDrivers, Array<ArcadeGame>&& games)
-      : mDrivers(limitedDrivers, rawDrivers)
+    ArcadeDatabase(String::List&& rawManufacturers, String::List&& limitedManufacturers, Array<ArcadeGame>&& games)
+      : mManufacturers(limitedManufacturers, rawManufacturers)
       , mGames(games)
-      , mLookup()
     {
       // Build lookup
       for(int i = games.Count(); --i >= 0;)
@@ -94,72 +93,85 @@ class ArcadeDatabase
     [[nodiscard]] bool IsValid() const { return !mGames.Empty(); }
 
     /*!
-     * @brief Check if games in this database can be filtered (more than one driver)
-     * @return True if there is more than one driver
+     * @brief Check if games in this database can be filtered (more than one manufacturer)
+     * @return True if there is more than one manufacturer
      */
-    [[nodiscard]] bool CanBeFiltered() const { return mDrivers.mLimited.size() > 1; }
+    [[nodiscard]] bool CanBeFiltered() const { return mManufacturers.mLimited.size() > 1; }
 
     /*!
-     * @brief Get driver name from its index (limited list)
-     * @param index driver index
-     * @return Driver name or empty string
+     * @brief Get manufacturer name from its index (limited list)
+     * @param index manufacturer index
+     * @return Manufacturer name or empty string
      */
-    [[nodiscard]] const String& LimitedDriverNameFromIndex(int index) const { if ((unsigned int)index < mDrivers.mLimited.size()) return mDrivers.mLimited[index]; static String __nulldriver; return __nulldriver; }
+    [[nodiscard]] const String& LimitedManufacturerNameFromIndex(int index) const { if ((unsigned int)index < mManufacturers.mLimited.size()) return mManufacturers.mLimited[index]; static String nullmanufacturer; return nullmanufacturer; }
 
     /*!
-     * @brief Get driver name from its index (limited list)
-     * @param name Driver name
+     * @brief Get manufacturer name from its index (limited list)
+     * @param name manufacturer name
      * @return Index or -1
      */
-    [[nodiscard]] int LimitedDriverIndexFromName(const String& name) const
+    [[nodiscard]] int LimitedManufacturerIndexFromName(const String& name) const
     {
-      for(int i = (int)mDrivers.mLimited.size(); --i >= 0;)
-        if (mDrivers.mLimited[i] == name)
+      for(int i = (int)mManufacturers.mLimited.size(); --i >= 0;)
+        if (mManufacturers.mLimited[i] == name)
           return i;
       return -1;
     }
 
     /*!
-     * @brief Get driver name from its index (raw list)
-     * @param index driver index
-     * @return Driver name or empty string
+     * @brief Get manufacturer name from its index (raw list)
+     * @param index manufacturer index
+     * @return manufacturer name or empty string
      */
-    [[nodiscard]] const String& RawDriverNameFromIndex(int index) const { if ((unsigned int)index < mDrivers.mRaw.size()) return mDrivers.mRaw[index]; static String __nulldriver; return __nulldriver; }
+    [[nodiscard]] const String& RawManufacturerNameFromIndex(int index) const { if ((unsigned int)index < mManufacturers.mRaw.size()) return mManufacturers.mRaw[index]; static String nullmanufacturer; return nullmanufacturer; }
 
     /*!
-     * @brief Get driver name from its index (raw list)
-     * @param name Driver name
+     * @brief Get manufacturer name from its index (limited list)
+     * @param name Manufacturer name
      * @return Index or -1
      */
-    [[nodiscard]] IndexList RawDriverIndexesFromFamilly(const String& name) const
+    [[nodiscard]] int RawManufacturerIndexFromName(const String& name) const
+    {
+      for(int i = (int)mManufacturers.mRaw.size(); --i >= 0;)
+        if (mManufacturers.mRaw[i] == name)
+          return i;
+      return -1;
+    }
+
+    /*!
+     * @brief Get manufacturer name from its index (raw list)
+     * @param name manufacturer name
+     * @return Index or -1
+     */
+    [[nodiscard]] IndexList RawManufacturerIndexesFromFamilly(const String& name) const
     {
       IndexList result;
-      for(int i = (int)mDrivers.mRaw.size(); --i >= 0;)
+      for(int i = (int)mManufacturers.mRaw.size(); --i >= 0;)
       {
-        const String& rawDriver = mDrivers.mRaw[i];
-        if (rawDriver == name) result.Add(i);
-        else if (rawDriver.Count() > name.Count())
-          if (rawDriver[name.Count()] == '/')
-            if (rawDriver.StartsWith(name))
+        const String& rawManufacturer = mManufacturers.mRaw[i];
+        if (rawManufacturer == name) result.Add(i);
+        else if (rawManufacturer.Count() > name.Count())
+          if (rawManufacturer[name.Count()] == '/')
+            if (rawManufacturer.StartsWith(name))
               result.Add(i);
       }
       return result;
     }
 
     /*!
-     * @brief Get driver list (limited list)
-     * @return Driver list
+     * @brief Get manufacturer list (limited list)
+     * @return Manufacturer list
      */
-    [[nodiscard]] virtual std::vector<Driver> GetLimitedDriverList() const
+    [[nodiscard]] virtual std::vector<Manufacturer> GetLimitedManufacturerList() const
     {
-      std::vector<Driver> result;
-      for(int i = 0; i < (int)mDrivers.mLimited.size(); ++i)
-        result.push_back(Driver(i, mDrivers.mLimited[i]));
+      std::vector<Manufacturer> result;
+      for(int i = 0; i < (int)mManufacturers.mLimited.size(); ++i)
+        result.push_back(Manufacturer(i, mManufacturers.mLimited[i]));
       return result;
     }
 
   private:
-    DriverLists mDrivers;                  //!< Driver lists
+    ManufacturerLists mManufacturers;      //!< Manufacturer lists
     Array<ArcadeGame> mGames;              //!< Game list
     HashMap<const FileData*, int> mLookup; //!< Reverse lookup FileData* => ArcadeGame
 };

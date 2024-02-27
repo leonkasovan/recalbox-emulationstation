@@ -28,11 +28,11 @@ void Path::Normalize()
         mPath.resize(mPath.size() - 1);
 
   // Remove double separator
-  if (mPath.find(sDoubleSeparatorString) != String::npos)
+  if (mPath.Contains(sDoubleSeparatorString))
     mPath = mPath.Replace(sDoubleSeparatorString, sSeparatorString);
 
   // Remove single colon
-  if (mPath.find(sSingleDotPath) != String::npos)
+  if (mPath.Contains(sSingleDotPath))
     mPath = mPath.Replace(sSingleDotPath, sSeparatorString);
   int size = (int)mPath.size();
   if (size == 1 && mPath[0] == '.')
@@ -412,7 +412,40 @@ Path Path::Cwd()
   return Path::Empty;                                           // Not lucky...
 }
 
-Path::PathList Path::GetDirectoryContent() const
+Path::PathList Path::GetDirectoryContent(bool storeFolders) const
+{
+  PathList list;
+
+  constexpr unsigned int dot    = (unsigned int)sDotDirectory;
+  constexpr unsigned int dotdot = (unsigned int)sDotDirectory | ((unsigned int)sDotDirectory << 8);
+
+  DIR* dir = opendir(mPath.c_str());
+  if(dir != nullptr)
+  {
+    const struct dirent* entry = nullptr;
+    // loop over all files in the directory
+    while((entry = readdir(dir)) != nullptr)
+    {
+      // Ignore "." and ".."
+      unsigned int strint = *((unsigned int*)entry->d_name);
+      if ((strint &   0xFFFF) == dot   ) continue;
+      if ((strint & 0xFFFFFF) == dotdot) continue;
+
+      // Store folders?
+      if (entry->d_type == DT_DIR && !storeFolders) continue;
+
+      Path item(mPath);
+      item.mPath.Append(sSeparator);
+      item.mPath.Append(entry->d_name);
+      list.push_back(item);
+    }
+    closedir(dir);
+  }
+
+  return list;
+}
+
+Path::PathList Path::RecurseDirectoryContent(bool storeFolders) const
 {
   PathList list;
 
@@ -434,6 +467,15 @@ Path::PathList Path::GetDirectoryContent() const
       Path item(mPath);
       item.mPath.Append(sSeparator);
       item.mPath.Append(entry->d_name);
+
+      // Store folders?
+      if (entry->d_type == DT_DIR)
+      {
+        PathList sub = item.RecurseDirectoryContent(storeFolders);
+        list.insert(list.end(), sub.begin(), sub.end());
+        if (!storeFolders) continue;
+      }
+
       list.push_back(item);
     }
     closedir(dir);

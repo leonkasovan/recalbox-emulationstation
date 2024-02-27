@@ -14,6 +14,7 @@
 #include <components/SwitchComponent.h>
 #include <views/ViewController.h>
 #include <LibretroRatio.h>
+#include "games/GameFilesUtils.h"
 
 GuiMenuGamelistGameOptions::GuiMenuGamelistGameOptions(WindowManager& window, ISimpleGameListView& view, SystemManager& systemManager, SystemData& system, FileData& game)
   : GuiMenuBase(window, _("GAME OPTIONS"), this)
@@ -37,6 +38,12 @@ GuiMenuGamelistGameOptions::GuiMenuGamelistGameOptions(WindowManager& window, IS
   if (mGame.IsGame())
     mEmulator = AddList<String>(_("RUN WITH"), (int)Components::Emulator, this, GetEmulatorEntries(), _(MENUMESSAGE_ADVANCED_EMU_EMU_HELP_MSG));
 
+  // Patch width
+  if (mGame.IsGame() && !GameFilesUtils::GetSoftPatches(&mGame).empty())
+  {
+    mPath = AddList<Path>(_("SOFTPATCHING"), (int)Components::Patch, this, GetPatchEntries());
+
+  }
   // Ratio
   if (mGame.IsGame())
     mRatio = AddList<String>(_("Ratio"), (int)Components::Ratio, this, GetRatioEntries(), _(MENUMESSAGE_GAME_RATIO_HELP_MSG));
@@ -72,6 +79,23 @@ GuiMenuGamelistGameOptions::GuiMenuGamelistGameOptions(WindowManager& window, IS
   // Scrape
   if (mGame.IsGame())
     AddSubMenu(_("SCRAPE"), (int)Components::Scrape);
+
+
+//  _N("%i GAME HIDDEN", "%i GAMES HIDDEN", data.Hidden)) .Replace("%i", String(data.Hidden)
+  if (mGame.IsGame() )
+  {
+    int timePlayed = mGame.Metadata().TimePlayed();
+    if (timePlayed >= 3600)
+    {
+      int hours = timePlayed / 3600;
+      AddText(_("TIME PLAYED"), _N("%i HOUR", "%i HOURS", hours).Replace("%i", String(hours)));
+    }
+    else if (timePlayed >= 60)
+    {
+      int minutes = timePlayed / 60;
+      AddText(_("TIME PLAYED"), _N("%i MINUTE", "%i MINUTES", minutes).Replace("%i", String(minutes)));
+    }
+  }
 }
 
 GuiMenuGamelistGameOptions::~GuiMenuGamelistGameOptions()
@@ -108,11 +132,31 @@ std::vector<GuiMenuBase::ListEntry<String>> GuiMenuGamelistGameOptions::GetEmula
   String currentEmulator(mGame.Metadata().Emulator());
   String currentCore    (mGame.Metadata().Core());
   GuiMenuTools::EmulatorAndCoreList eList =
-    GuiMenuTools::ListEmulatorAndCore(mSystemManager, mGame.System(), mDefaultEmulator, mDefaultCore, currentEmulator, currentCore);
+    GuiMenuTools::ListGameEmulatorAndCore(mGame, mDefaultEmulator, mDefaultCore, currentEmulator, currentCore);
   if (!eList.empty())
     for (const GuiMenuTools::EmulatorAndCore& emulator : eList)
       list.push_back({ emulator.Displayable, emulator.Identifier, emulator.Selected });
 
+  return list;
+}
+
+
+std::vector<GuiMenuBase::ListEntry<Path>> GuiMenuGamelistGameOptions::GetPatchEntries()
+{
+  std::vector<ListEntry<Path>> list;
+  std::vector<Path> patches = GameFilesUtils::GetSoftPatches(&mGame);
+
+
+  unsigned long patchListSize = patches.size();
+  list.push_back({ _("original"), Path("original")  , true});
+
+  for(auto& path : patches)
+  {
+    bool isDefault = patchListSize == 1 || (path == mGame.Metadata().LastPatch() && mGame.Metadata().LastPatch().Exists());
+    String patchName = path.Directory() == mGame.RomPath().Directory() ? path.Filename() + " (auto)" : path.Filename();
+
+    list.push_back({ patchName, path , isDefault });
+  }
   return list;
 }
 
@@ -124,7 +168,8 @@ void GuiMenuGamelistGameOptions::OptionListComponentChanged(int id, int index, c
     mGame.Metadata().SetEmulator(String::Empty);
     mGame.Metadata().SetCore(String::Empty);
     // Split emulator & core
-    String emulator, core;
+    String emulator;
+    String core;
     if (value.Extract(':', emulator, core, false))
       if (emulator != mDefaultEmulator || core != mDefaultCore)
       {
@@ -134,6 +179,13 @@ void GuiMenuGamelistGameOptions::OptionListComponentChanged(int id, int index, c
   }
   else if ((Components)id == Components::Ratio)
     mGame.Metadata().SetRatio(value);
+}
+
+void GuiMenuGamelistGameOptions::OptionListComponentChanged(int id, int index, const Path& value)
+{
+  (void)index;
+  if ((Components)id == Components::Patch)
+    mGame.Metadata().SetLastPatch(value);
 }
 
 void GuiMenuGamelistGameOptions::OptionListComponentChanged(int id, int index, const GameGenres& value)
@@ -151,7 +203,7 @@ void GuiMenuGamelistGameOptions::EditableComponentTextChanged(int id, const Stri
     mGame.Metadata().SetDescription(text);
 }
 
-void GuiMenuGamelistGameOptions::SwitchComponentChanged(int id, bool status)
+void GuiMenuGamelistGameOptions::SwitchComponentChanged(int id, bool& status)
 {
   MetadataType updatedMetadata = MetadataType::None;
   switch((Components)id)
@@ -186,7 +238,9 @@ void GuiMenuGamelistGameOptions::SwitchComponentChanged(int id, bool status)
     case Components::Genre:
     case Components::Scrape:
     case Components::Ratio:
-    case Components::Emulator: break;
+    case Components::Emulator:
+    case Components::Patch:
+      break;
   }
   if (updatedMetadata != MetadataType::None)
     mSystemManager.UpdateSystemsOnGameChange(&mGame, updatedMetadata, false);

@@ -14,8 +14,9 @@
 #include "GuiMenu.h"
 #include "guis/GuiMsgBox.h"
 
-GuiMenuGameFilters::GuiMenuGameFilters(WindowManager& window)
+GuiMenuGameFilters::GuiMenuGameFilters(WindowManager& window, SystemManager& systemManager)
   :	GuiMenuBase(window, _("GAME FILTERS"), nullptr)
+  , mSystemManager(systemManager)
 {
   AddSwitch(_("SHOW ONLY LATEST VERSION") + " (BETA)", RecalboxConf::Instance().GetShowOnlyLatestVersion(), (int)Components::ShowOnlyLatestVersion, this, _(MENUMESSAGE_UI_ONLY_LAST_VERSION_MSG));
 
@@ -30,51 +31,88 @@ GuiMenuGameFilters::GuiMenuGameFilters(WindowManager& window)
   AddSwitch(_("HIDE NO GAMES"), RecalboxConf::Instance().GetHideNoGames(), (int)Components::NoGames, this, _(MENUMESSAGE_UI_HIDE_NO_GAMES_MSG));
 }
 
-GuiMenuGameFilters::~GuiMenuGameFilters()
-{
-  if(!ViewController::Instance().CheckFilters())
-   ManageSystems();
-}
-
-void GuiMenuGameFilters::SwitchComponentChanged(int id, bool status)
+void GuiMenuGameFilters::SwitchComponentChanged(int id, bool& status)
 {
   switch((Components)id)
   {
     case Components::ShowOnlyLatestVersion:
-      RecalboxConf::Instance().SetShowOnlyLatestVersion(status).Save();
-      ManageSystems();
+    {
+      RecalboxConf::Instance().SetShowOnlyLatestVersion(status);
+      if (mSystemManager.UpdatedTopLevelFilter())
+        RecalboxConf::Instance().Save();
+      else
+      {
+        mWindow.displayMessage(_("There is no game to show after this filter is changed! No change recorded."));
+        RecalboxConf::Instance().SetShowOnlyLatestVersion(!status);
+        status = !status;
+      }
       break;
+    }
     case Components::FavoritesOnly:
-      RecalboxConf::Instance().SetFavoritesOnly(status).Save();
-      ManageSystems();
+    {
+      RecalboxConf::Instance().SetFavoritesOnly(status);
+      if (mSystemManager.UpdatedTopLevelFilter())
+        RecalboxConf::Instance().Save();
+      else
+      {
+        mWindow.displayMessage(_("There is no favorite games in any system!"));
+        RecalboxConf::Instance().SetFavoritesOnly(!status);
+        status = !status;
+      }
       break;
+    }
     case Components::ShowHidden:
-      RecalboxConf::Instance().SetShowHidden(status).Save();
-      ManageSystems();
+    {
+      RecalboxConf::Instance().SetShowHidden(status);
+      if (mSystemManager.UpdatedTopLevelFilter())
+        RecalboxConf::Instance().Save();
+      else
+      {
+        mWindow.displayMessage(_("There is no game to show after this filter is changed! No change recorded."));
+        RecalboxConf::Instance().SetShowHidden(!status);
+        status = !status;
+      }
       break;
+    }
     case Components::Adult:
-      RecalboxConf::Instance().SetFilterAdultGames(status).Save();
-      ManageSystems();
+    {
+      RecalboxConf::Instance().SetFilterAdultGames(status);
+      if (mSystemManager.UpdatedTopLevelFilter())
+        RecalboxConf::Instance().Save();
+      else
+      {
+        mWindow.displayMessage(_("There is no game to show after this filter is changed! No change recorded."));
+        RecalboxConf::Instance().SetFilterAdultGames(!status);
+        status = !status;
+      }
       break;
+    }
     case Components::HidePreinstalled:
-      RecalboxConf::Instance().SetGlobalHidePreinstalled(status).Save();
-      ManageSystems();
+    {
+      RecalboxConf::Instance().SetGlobalHidePreinstalled(status);
+      if (mSystemManager.UpdatedTopLevelFilter())
+        RecalboxConf::Instance().Save();
+      else
+      {
+        mWindow.displayMessage(_("There is no game to show after this filter is changed! No change recorded."));
+        RecalboxConf::Instance().SetGlobalHidePreinstalled(!status);
+        status = !status;
+      }
       break;
+    }
     case Components::NoGames:
-      RecalboxConf::Instance().SetHideNoGames(status).Save();
-      ManageSystems();
+    {
+      RecalboxConf::Instance().SetHideNoGames(status);
+      if (mSystemManager.UpdatedTopLevelFilter())
+        RecalboxConf::Instance().Save();
+      else
+      {
+        mWindow.displayMessage(_("There is no game to show after this filter is changed! No change recorded."));
+        RecalboxConf::Instance().SetHideNoGames(!status);
+        status = !status;
+      }
       break;
+    }
+    default: break;
   }
-}
-
-void GuiMenuGameFilters::ManageSystems()
-{
-  SystemData* systemData = ViewController::Instance().CurrentSystem();
-  ViewController::Instance().GetOrCreateGamelistView(systemData)->refreshList();
-
-  ViewController::Instance().InvalidateAllGamelistsExcept(nullptr);
-  ViewController::Instance().getSystemListView().manageSystemsList();
-
-  // for updating game counts on system view
-  ViewController::Instance().getSystemListView().onCursorChanged(CursorState::Stopped);
 }

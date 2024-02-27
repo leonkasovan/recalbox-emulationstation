@@ -87,6 +87,25 @@ HashMap< String, HashMap<String, ThemeData::ElementProperty> >& ThemeData::Eleme
         { "disabled", ElementProperty::Boolean },
       },
     },
+    { "textscroll",
+      {
+        { "pos", ElementProperty::NormalizedPair },
+        { "size", ElementProperty::NormalizedPair },
+        { "origin", ElementProperty::NormalizedPair },
+        { "rotation", ElementProperty::Float },
+        { "rotationOrigin", ElementProperty::NormalizedPair },
+        { "text", ElementProperty::String },
+        { "backgroundColor", ElementProperty::Color },
+        { "fontPath", ElementProperty::Path },
+        { "fontSize", ElementProperty::Float },
+        { "color", ElementProperty::Color },
+        { "alignment", ElementProperty::String },
+        { "forceUppercase", ElementProperty::Boolean },
+        { "value", ElementProperty::String },
+        { "zIndex", ElementProperty::Float },
+        { "disabled", ElementProperty::Boolean },
+      },
+    },
     { "textlist",
       {
         { "pos", ElementProperty::NormalizedPair },
@@ -225,6 +244,8 @@ HashMap< String, HashMap<String, ThemeData::ElementProperty> >& ThemeData::Eleme
         { "iconLicense", ElementProperty::Path },
         { "iconRecalboxRGBDual", ElementProperty::Path },
         { "iconTate", ElementProperty::Path },
+        { "iconArcade", ElementProperty::Path },
+        { "iconDownload", ElementProperty::Path },
       },
     },
     { "menuSwitch",
@@ -297,15 +318,17 @@ ThemeData::ThemeData()
 
 bool ThemeData::CheckThemeOption(String& selected, const HashMap<String, String>& subsets, const String& subset)
 {
-  HashMap<String, String> map = sortThemeSubSets(subsets, subset);
+  String::List list = sortThemeSubSets(subsets, subset);
   // Empty subset?
   if (subsets.empty()) return false;
-  if (map.empty()) return false;
+  if (list.empty()) return false;
   // Try to fix the value if not found
-  auto selectedColorSet = map.find(selected);
-  if (selectedColorSet == map.end())
+  bool found = false;
+  for(const String& s : list)
+    if (s == selected) { found = true; break; }
+  if (!found)
   {
-    selected = map.begin()->first;
+    selected = list.front();
     return true;
   }
   return false;
@@ -378,7 +401,7 @@ void ThemeData::parseIncludes(const pugi::xml_node& root)
 			String str = resolveSystemVariable(mSystemThemeFolder, node.text().get(), mRandomPath);
 			
 			//workaround for an issue in parseincludes introduced by variable implementation
-			if (str.find("//") == String::npos)
+			if (!str.Contains("//"))
 			{
 				Path path = Path(str).ToAbsolute(mPaths.back().Directory());
 				if(!ResourceManager::fileExists(path))
@@ -580,8 +603,8 @@ void ThemeData::parseElement(const pugi::xml_node& root, const HashMap<String, E
       float x = 0, y = 0;
       if (str.TryAsFloat(0, ' ', x))
       {
-        size_t pos = str.find(' ');
-        if (pos != String::npos)
+        int pos = str.Find(' ');
+        if (pos >= 0)
           if (str.TryAsFloat((int) pos + 1, 0, y))
           {
             element.AddVectorProperty(node.name(), x, y);
@@ -602,7 +625,7 @@ void ThemeData::parseElement(const pugi::xml_node& root, const HashMap<String, E
 			if(!ResourceManager::fileExists(path))
 			{
 				//too many warnings with region and system variable surcharge in themes
-				if (!root.attribute("region") && variable.find("$system") == String::npos)
+				if (!root.attribute("region") && !variable.Contains("$system"))
 				{
 					String ss = "  Warning " + ThemeException::AddFiles(mPaths); // "from theme yadda yadda, included file yadda yadda
 					ss += String("could not find file \"") + node.text().get() + "\" ";
@@ -909,20 +932,20 @@ void ThemeData::findRegion(const pugi::xml_document& doc, HashMap<String, String
 }
 
 // as the getThemeSubSets process is heavy, doing it 1 time for all subsets then sorting on demand
-HashMap<String, String> ThemeData::sortThemeSubSets(const HashMap<String, String>& subsetmap, const String& subset)
+String::List ThemeData::sortThemeSubSets(const HashMap<String, String>& subsetmap, const String& subset)
 {
-	HashMap<String, String> sortedsets;
+  String::List sortedsets;
 
 	for (const auto& it : subsetmap)
-	{
 		if (it.second == subset)
-			sortedsets[it.first] = it.first;
-	}
+			sortedsets.push_back(it.first);
 
 	if(subset == "gameclipview" && !sortedsets.empty() )
-	    sortedsets[getNoTheme()] = getNoTheme();
+	    sortedsets.push_back(getNoTheme());
 
-    return sortedsets;
+  std::sort(sortedsets.begin(), sortedsets.end());
+
+  return sortedsets;
 }
 
 

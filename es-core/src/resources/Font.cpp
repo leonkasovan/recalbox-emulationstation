@@ -8,6 +8,11 @@
 
 FT_Library Font::sLibrary = nullptr;
 
+Path Font::sRecalboxIconPath(":/Recalbox_icons.ttf");
+Path Font::sDroidPath("/usr/share/fonts/truetype/DroidSansFallback.ttf");
+Path Font::sDejaVuPath("/usr/share/fonts/truetype/DejaVuSansCondensed.ttf");
+Path Font::sUbuntuPath("/usr/share/fonts/truetype/ubuntu_condensed.ttf");
+
 int Font::getSize() const
 { return mSize; }
 
@@ -286,8 +291,8 @@ void Font::FontTexture::initTexture()
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
   glPixelStorei(GL_PACK_ALIGNMENT, 1);
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -333,10 +338,10 @@ void Font::getTextureForNewGlyph(const Vector2i& glyphSize, FontTexture*& tex_ou
 const std::vector<Path>& getFallbackFontPaths()
 {
   static Path originalPath[] = {
-    Path(":/Recalbox_icons.ttf"),
-    Path("/usr/share/fonts/truetype/DroidSansFallback.ttf"),// japanese, chinese, korean
-    Path("/usr/share/fonts/truetype/DejaVuSansCondensed.ttf"),
-    Path("/usr/share/fonts/truetype/ubuntu_condensed.ttf"),
+    Font::sRecalboxIconPath,
+    Font::sDroidPath,
+    Font::sDejaVuPath,
+    Font::sUbuntuPath,
   };
   static std::vector<Path> fontPaths;
   if (fontPaths.empty())
@@ -500,6 +505,8 @@ void Font::renderCharacter(unsigned int character, float x, float y, float wr, f
 
   Vector2f topLeft(0.0f + x, 0.0f + y);
   Vector2f bottomRight(glyphWidth * wr + x, glyphHeight * hr + y);
+  topLeft.round();
+  bottomRight.round();
 
   vertices[0].pos.Set(topLeft.x(), topLeft.y());
   vertices[1].pos.Set(topLeft.x(), bottomRight.y());

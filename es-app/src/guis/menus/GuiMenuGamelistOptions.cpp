@@ -30,7 +30,6 @@ GuiMenuGamelistOptions::GuiMenuGamelistOptions(WindowManager& window, SystemData
   if (!nomenu && !bartop)
   {
     mGame = AddSubMenu(String::Empty, (int) Components::MetaData,_(MENUMESSAGE_GAMELISTOPTION_EDIT_METADATA_MSG));
-    RefreshGameMenuContext();
 
     if(!mGamelist.getCursor()->IsEmpty())
     {
@@ -44,6 +43,11 @@ GuiMenuGamelistOptions::GuiMenuGamelistOptions(WindowManager& window, SystemData
       if (mSystem.IsScreenshots())
       {
         AddSubMenu(_("DELETE SCREENSHOT"), (int) Components::DeleteScreeshot);
+      }
+
+      if (RecalboxConf::Instance().GetAutorunEnabled() && mGamelist.getCursor()->IsGame())
+      {
+        AddSwitch(_("BOOT ON THIS GAME"), mGamelist.getCursor()->RomPath().ToString() == RecalboxConf::Instance().GetAutorunGamePath(), (int) Components::AutorunGame, this);
       }
 
       if (!GameFilesUtils::GetGameSaveStateFiles(*mGamelist.getCursor()).empty())
@@ -178,7 +182,7 @@ std::vector<GuiMenuBase::ListEntry<unsigned int>> GuiMenuGamelistOptions::GetLet
 
 void GuiMenuGamelistOptions::Delete(FileData& game)
 {
-  game.RomPath().Delete();
+  (void)game.RomPath().Delete();
   if (game.Parent() != nullptr)
   {
     game.Parent()->RemoveChild(&game);
@@ -249,7 +253,7 @@ void GuiMenuGamelistOptions::SubMenuSelected(int id)
   {
     case Components::Download:
     {
-      mWindow.pushGui(new GuiDownloader(mWindow, mSystem));
+      mWindow.pushGui(new GuiDownloader(mWindow, mSystem, mSystemManager));
       break;
     }
     case Components::MetaData:
@@ -279,10 +283,10 @@ void GuiMenuGamelistOptions::SubMenuSelected(int id)
     {
       mWindow.pushGui(new GuiMsgBox(mWindow, _("DELETE SCREENSHOT, CONFIRM?"), _("YES"), [this]
       {
-        mGamelist.getCursor()->RomPath().Delete();
+        (void)mGamelist.getCursor()->RomPath().Delete();
         RootFolderData::DeleteChild(mGamelist.getCursor());
         mSystemManager.UpdateSystemsOnGameChange(mGamelist.getCursor(), MetadataType::None, true);
-        mWindow.deleteAllGui();
+        mWindow.CloseAll();
       }, _("NO"), {}));
       break;
     }
@@ -299,7 +303,7 @@ void GuiMenuGamelistOptions::SubMenuSelected(int id)
     }
     case Components::ArcadeOptions:
     {
-      mWindow.pushGui(new GuiMenuArcade(mWindow, mArcade));
+      mWindow.pushGui(new GuiMenuArcade(mWindow, mSystemManager, mArcade));
       break;
     }
     case Components::JumpToLetter:
@@ -307,16 +311,43 @@ void GuiMenuGamelistOptions::SubMenuSelected(int id)
     case Components::Regions:
     case Components::FavoritesOnly:
     case Components::FlatFolders:
-      break;
+    case Components::AutorunGame: break;
   }
 }
 
-void GuiMenuGamelistOptions::SwitchComponentChanged(int id, bool status)
+void GuiMenuGamelistOptions::SwitchComponentChanged(int id, bool& status)
 {
   switch((Components)id)
   {
     case Components::FlatFolders: RecalboxConf::Instance().SetSystemFlatFolders(mSystem, status).Save(); break;
-    case Components::FavoritesOnly: RecalboxConf::Instance().SetFavoritesOnly(status).Save(); ManageSystems(); break;
+    case Components::FavoritesOnly:
+    {
+      RecalboxConf::Instance().SetFavoritesOnly(status);
+      if (mSystemManager.UpdatedTopLevelFilter())
+        RecalboxConf::Instance().Save();
+      else
+      {
+        mWindow.displayMessage(_("There is no favorite games in any system!"));
+        RecalboxConf::Instance().SetFavoritesOnly(!status);
+        status = false;
+      }
+      break;
+    }
+    case Components::AutorunGame:
+    {
+      FileData* game = mGamelist.getCursor();
+      if (game->IsGame())
+      {
+        if (status)
+          RecalboxConf::Instance().SetAutorunGamePath(game->RomPath().ToString())
+                                  .SetAutorunSystemUUID(game->System().Descriptor().GUID())
+                                  .Save();
+        else
+          RecalboxConf::Instance().SetAutorunGamePath(String::Empty)
+                                  .SetAutorunSystemUUID(String::Empty)
+                                  .Save();
+      }
+    }
     case Components::Download:
     case Components::Regions:
     case Components::Sorts:

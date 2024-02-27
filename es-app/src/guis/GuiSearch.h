@@ -14,37 +14,17 @@
 #include <components/VideoComponent.h>
 #include <themes/MenuThemeData.h>
 #include "systems/SystemManager.h"
-#include "utils/network/Http.h"
-#include "systems/DownloaderManager.h"
-
-enum class DownloadingGameState
-{
-  Start,             //!< Init
-  // Actions
-  Downloading,       //!< Downloading games
-  Extracting,        //!< Extracting
-  UpdatingMetadata,  //!< Update metadata
-  // Errors
-  WriteOnlyShare,    //!< Share is write only!
-  DownloadError,     //!< Error downloading file(s)
-};
 
 class SearchResult2 {
 public:
     std::string system;
-    std::string filename;
     std::string title;
-    std::string company;
-    std::string hardware;
-    std::string year;
-    String parent;
-    std::string status;
     std::string url;
-    std::string size;
+    std::string desc;
 
     //mSR2.emplace_back(category, a_name, a_title, a_company, a_hardware, a_year, a_parent, a_status, Format("%s/%s", base_url, a_relative_url), a_size);
-    SearchResult2(const std::string& sy, const std::string& fn, const std::string& ti, const std::string& co, const std::string& ha, const std::string& ye, const std::string& pa, const std::string& st, const std::string& ur, const std::string& si) : 
-    system(sy), filename(fn), title(ti), company(co), hardware(ha), year(ye), parent(pa), status(st), url(ur), size(si) {}
+    SearchResult2(const std::string& sy, const std::string& ti, const std::string& ur, const std::string& de) : 
+    system(sy), title(ti), url(ur), desc(de) {}
 };
 
 class GuiSearch : public Gui, public IGuiArcadeVirtualKeyboardInterface
@@ -75,8 +55,6 @@ class GuiSearch : public Gui, public IGuiArcadeVirtualKeyboardInterface
     void populateGridMeta(int i);
 
     void launch();
-
-    void download();
 
     void GoToGame();
 
@@ -119,12 +97,7 @@ class GuiSearch : public Gui, public IGuiArcadeVirtualKeyboardInterface
     std::shared_ptr<OptionListComponent<FolderData::FastSearchContext>> mSearchChoices;
     FileData::List mSearchResults;
     SystemData* mSystemData;
-    Http mRequest;
     std::vector<SearchResult2> mSR2;
-    //! Download manager private instance
-    DownloaderManager mDownloadManager;
-    //! Active downloader
-    BaseSystemDownloader* mDownloader;
 
     //! Just-open flag
     bool mJustOpen;
@@ -146,6 +119,5 @@ class GuiSearch : public Gui, public IGuiArcadeVirtualKeyboardInterface
      */
     void ArcadeVirtualKeyboardCanceled(GuiArcadeVirtualKeyboard& vk) final;
 };
-
 
 #endif //EMULATIONSTATION_ALL_GUISEARCH_H

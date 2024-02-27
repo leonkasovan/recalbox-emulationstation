@@ -4,7 +4,7 @@
 #pragma once
 
 #include <utils/String.h>
-#include "utils/network/Http.h"
+#include "utils/network/HttpClient.h"
 #include <utils/datetime/DateTime.h>
 #include <rapidjson/document.h>
 #include <scraping/ScrapeResult.h>
@@ -65,6 +65,14 @@ class ScreenScraperApis
           String mMd5;
           //! size
           long long mSize;
+
+          [[nodiscard]] bool IsValid() const
+          {
+            return !mUrl.empty() &&
+                   !mFormat.empty() &&
+                   !mMd5.empty() &&
+                   mSize != 0;
+          }
         };
 
         //! Main image
@@ -95,7 +103,7 @@ class ScreenScraperApis
     bool mClientInitialized;
 
     //! Htpp client
-    Http mClient;
+    HttpClient mClient;
 
     /*!
      * @brief Deserialize a gameinfo request JSON result into a Game object

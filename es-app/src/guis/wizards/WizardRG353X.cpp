@@ -42,7 +42,7 @@ String WizardRG353X::OnTextRequired(int page)
   return String();
 }
 
-Wizard::Move WizardRG353X::OnKeyReceived(int page, const InputCompactEvent& event)
+SimpleWizardBase::Move WizardRG353X::OnKeyReceived(int page, const InputCompactEvent& event)
 {
   if (event.CancelPressed()) return Move::Backward;
 

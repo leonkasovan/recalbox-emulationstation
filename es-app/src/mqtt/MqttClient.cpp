@@ -24,7 +24,7 @@ MqttClient::MqttClient(const char* clientId, IMQTTMessageReceived* callback)
   try
   {
     if (mOriginalTocken = mMqtt.connect(connectOptions, nullptr, *this); mOriginalTocken != nullptr)
-      { LOG(LogError) << "[MQTT] Connexion to " << mMqtt.get_server_uri() << " from " << mMqtt.get_client_id() << " successful !"; }
+      { mMqtt.start_consuming(); LOG(LogError) << "[MQTT] Connexion to " << mMqtt.get_server_uri() << " from " << mMqtt.get_client_id() << " successful !"; }
     else
       { LOG(LogError) << "[MQTT] Connexion to " << mMqtt.get_server_uri() << " from " << mMqtt.get_client_id() << " failed (init) !"; }
   }
@@ -34,7 +34,12 @@ MqttClient::MqttClient(const char* clientId, IMQTTMessageReceived* callback)
   }
 }
 
-bool MqttClient::Send(const String& topic, const String& message)
+MqttClient::~MqttClient()
+{
+  mMqtt.stop_consuming();
+}
+
+bool MqttClient::Send(const String& topic, const String& message, int qos)
 {
   #ifdef FREEZE_MQTT
   return true;
@@ -42,7 +47,7 @@ bool MqttClient::Send(const String& topic, const String& message)
 
   try
   {
-    mMqtt.publish(topic, message.data(), message.size(), 0, false, nullptr, *this);
+    mMqtt.publish(topic, message.data(), message.size(), qos, false, nullptr, *this);
     return true;
   }
   catch(std::exception& e)
@@ -98,7 +103,10 @@ void MqttClient::on_success(const mqtt::token& asyncActionToken)
     }
     case mqtt::token::PUBLISH:
     {
-      { LOG(LogInfo) << "[MQTT] Publishing to " << mMqtt.get_server_uri() << " from " << mMqtt.get_client_id() << " OK!"; }
+      if (mMqtt.get_client_id() == "recalbox-api-server-broadcaster")
+        { LOG(LogTrace) << "[MQTT] Publishing to " << mMqtt.get_server_uri() << " from " << mMqtt.get_client_id() << " OK!"; }
+      else
+        { LOG(LogInfo) << "[MQTT] Publishing to " << mMqtt.get_server_uri() << " from " << mMqtt.get_client_id() << " OK!"; }
       break;
     }
     case mqtt::token::UNSUBSCRIBE:
@@ -154,7 +162,18 @@ void MqttClient::ReceiveSyncMessage()
 
 void MqttClient::Wait()
 {
-  mOriginalTocken->wait();
+  #ifndef FREEZE_MQTT
+  if (mOriginalTocken)
+    mOriginalTocken->wait();
+  #endif
+}
+
+void MqttClient::WaitFor(int t)
+{
+  (void)t;
+  #ifndef FREEZE_MQTT
+  mOriginalTocken->wait_for(t);
+  #endif
 }
 
 void MqttClient::Disconnect()

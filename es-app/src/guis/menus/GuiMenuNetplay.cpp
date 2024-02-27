@@ -93,7 +93,7 @@ void GuiMenuNetplay::OptionListComponentChanged(int id, int index, const Recalbo
     RecalboxConf::Instance().SetNetplayRelay(value).Save();
 }
 
-void GuiMenuNetplay::SwitchComponentChanged(int id, bool status)
+void GuiMenuNetplay::SwitchComponentChanged(int id, bool& status)
 {
   RecalboxConf::Instance().SetNetplayEnabled(status).Save();
   if ((Components)id == Components::Enabled && status)

@@ -28,7 +28,7 @@ GuiMenuKodiSettings::GuiMenuKodiSettings(WindowManager& window)
   mKodiX = AddSwitch(_("START KODI WITH X"), RecalboxConf::Instance().GetKodiXButton(), (int)Components::ButtonX, this, _(MENUMESSAGE_ADVANCED_KODI_X_HELP_MSG));
 }
 
-void GuiMenuKodiSettings::SwitchComponentChanged(int id, bool status)
+void GuiMenuKodiSettings::SwitchComponentChanged(int id, bool& status)
 {
   switch((Components)id)
   {

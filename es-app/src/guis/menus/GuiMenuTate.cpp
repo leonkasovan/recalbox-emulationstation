@@ -17,10 +17,20 @@ GuiMenuTate::GuiMenuTate(WindowManager& window, SystemManager& systemManager)
   // Enable virtual system
   AddSwitch(_("ENABLE TATE VIRTUAL SYSTEM"), mOriginalTateEnabled, (int)Components::TateEnabled, this);
 
+  class Filter : public IFilter
+  {
+    public:
+      bool ApplyFilter(const FileData& file) override
+      {
+        return file.Metadata().Rotation() == RotationType::Left ||
+               file.Metadata().Rotation() == RotationType::Right;
+      }
+  } filter;
+
   // Enable virtual system
   bool hasTateGames = false;
   for(const SystemData* system : systemManager.VisibleSystemList())
-    if (system->HasVisibleGame(true))
+    if (system->MasterRoot().HasFilteredItemsRecursively(&filter))
     {
       hasTateGames = true;
       break;
@@ -87,27 +97,28 @@ void GuiMenuTate::OptionListComponentChanged(int id, int index, const RotationTy
   }
 }
 
-void GuiMenuTate::SwitchComponentChanged(int id, bool status)
+void GuiMenuTate::SwitchComponentChanged(int id, bool& status)
 {
   switch((Components)id)
   {
     case Components::TateEnabled:
+    {
       RecalboxConf::Instance().SetCollectionTate(status).Save();
-      if (status)
-      {
-        ViewController::Instance().getSystemListView().manageTate(false);
-        ViewController::Instance().getSystemListView().onCursorChanged(CursorState::Stopped);
-      }
-      else {
-        ViewController::Instance().getSystemListView().manageTate(true);
-        ViewController::Instance().getSystemListView().onCursorChanged(CursorState::Stopped);
-      }
+      mSystemManager.UpdateVirtualSystemsVisibility(VirtualSystemType::Tate,
+                                                    status ? SystemManager::Visibility::ShowAndSelect : SystemManager::Visibility::Hide);
       break;
+    }
     case Components::TateOnly:
     {
-      RecalboxConf::Instance().SetTateOnly(status).Save();
-      ViewController::Instance().InvalidateAllGamelistsExcept(nullptr);
-      ViewController::Instance().getSystemListView().manageSystemsList();
+      RecalboxConf::Instance().SetTateOnly(status);
+      if (mSystemManager.UpdatedTopLevelFilter())
+        RecalboxConf::Instance().Save();
+      else
+      {
+        mWindow.displayMessage(_("There is no TATE game to show!No change recorded."));
+        RecalboxConf::Instance().SetTateOnly(!status);
+        status = !status;
+      }
       break;
     }
     case Components::TateGamesRotation:

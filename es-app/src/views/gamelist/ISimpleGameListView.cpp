@@ -5,6 +5,7 @@
 #include "guis/menus/GuiMenuGamelistOptions.h"
 #include "views/ViewController.h"
 #include "RotationManager.h"
+#include "views/MenuFilter.h"
 #include <usernotifications/NotificationManager.h>
 
 ISimpleGameListView::ISimpleGameListView(WindowManager& window, SystemManager& systemManager, SystemData& system)
@@ -219,7 +220,7 @@ bool ISimpleGameListView::ProcessInput(const InputCompactEvent& event)
   }
 
   // JUMP TO -10
-  if (event.L2Pressed())
+  if (event.L2Pressed() || (!RecalboxConf::Instance().GetQuickSystemSelect() && event.AnyPrimaryLeftReleased()))
   {
     auto index = getCursorIndex();
     if (index > 0)
@@ -230,7 +231,7 @@ bool ISimpleGameListView::ProcessInput(const InputCompactEvent& event)
   }
 
   // JUMP TO +10
-  if (event.R2Pressed())
+  if (event.R2Pressed() || (!RecalboxConf::Instance().GetQuickSystemSelect() && event.AnyPrimaryRightReleased()))
   {
     auto index = getCursorIndex();
     auto max = getCursorIndexMax();
@@ -257,8 +258,7 @@ bool ISimpleGameListView::ProcessInput(const InputCompactEvent& event)
         mWindow.pushGui(new GuiControlHints(mWindow, fd->RomPath()));
     return true;
   }
-
-  if (event.StartPressed())
+  if (event.StartPressed() && MenuFilter::ShouldDisplayMenu(MenuFilter::Menu::GamelistOptions))
   {
     clean();
     mWindow.pushGui(new GuiMenuGamelistOptions(mWindow, mSystem, mSystemManager, getArcadeInterface()));
@@ -281,10 +281,8 @@ bool ISimpleGameListView::getHelpPrompts(Help& help)
     help.Set(HelpType::X, _("NETPLAY"));
   else
   {
-    FileData* fd = getCursor();
-    if (fd != nullptr)
-      if (fd->HasP2K())
-        help.Set(HelpType::X, _("P2K CONTROLS"));
+    if (HasCurrentGameP2K())
+      help.Set(HelpType::X, _("P2K CONTROLS"));
   }
   FileData* fd = getCursor();
   if (!fd->TopAncestor().PreInstalled())
@@ -345,6 +343,13 @@ void ISimpleGameListView::jumpToNextLetter(bool forward)
   for(int i = cursorIndex; (i = (i + step) % max) != cursorIndex; )
     if (String::UpperUnicode(getDataAt(i)->Name().ReadFirstUTF8()) != baseChar) // Change to dynamic naming ASAP
     {
+      if (!forward) // In backward move, go to the latest same letter
+      {
+        baseChar = String::UpperUnicode(getDataAt(i)->Name().ReadFirstUTF8());
+        for(int j = i; (j = (j + step) % max) != cursorIndex; )
+          if (String::UpperUnicode(getDataAt(j)->Name().ReadFirstUTF8()) == baseChar) i = j;
+          else break;
+      }
       setCursorIndex(i);
       break;
     }

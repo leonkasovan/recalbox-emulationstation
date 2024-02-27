@@ -21,11 +21,9 @@ class GuiMenuVirtualSystems : public GuiMenuBase
     /*!
      * @brief Default constructor
      * @param window Global window
+     * @param systemManager System manager reference
      */
-    explicit GuiMenuVirtualSystems(WindowManager& window);
-
-    //! Destructor
-    ~GuiMenuVirtualSystems() override;
+    explicit GuiMenuVirtualSystems(WindowManager& window, SystemManager& systemManager);
 
   private:
     enum class Components
@@ -38,27 +36,8 @@ class GuiMenuVirtualSystems : public GuiMenuBase
       Ports,
     };
 
-    //! All game switch component
-    std::shared_ptr<SwitchComponent> mAllGames;
-    //! Multiplayers switch component
-    std::shared_ptr<SwitchComponent> mMultiplayers;
-    //! Last played switch component
-    std::shared_ptr<SwitchComponent> mLastPlayed;
-    //! Lightgun switch component
-    std::shared_ptr<SwitchComponent> mLightGun;
-    //! Ports switch component
-    std::shared_ptr<SwitchComponent> mPorts;
-
-    //! All games original value
-    bool mAllGamesOriginalValues;
-    //! Multiplayers original value
-    bool mMultiplayersOriginalValues;
-    //! Last Played original value
-    bool mLastPlayedOriginalValues;
-    //! Lightgun original value
-    bool mLightGunOriginalValues;
-    //! Ports original value
-    bool mPortsOriginalValues;
+    //! System manager reference
+    SystemManager& mSystemManager;
 
     /*
      * IGuiMenuBase implementation
@@ -70,7 +49,7 @@ class GuiMenuVirtualSystems : public GuiMenuBase
      * ISwitchComponent implementation
      */
 
-    void SwitchComponentChanged(int id, bool status) override;
+    void SwitchComponentChanged(int id, bool& status) override;
 };
 
 

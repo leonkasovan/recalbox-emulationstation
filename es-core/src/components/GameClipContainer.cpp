@@ -108,14 +108,16 @@ void GameClipContainer::initComponents()
     mClippingContainer.setZIndex(50);
 
     mClippingImage.setImage(Path(":/press_start.svg"));
-    mClippingImage.setMaxSize(mSize.x() * 0.12f, mSize.y() * 0.12f);
+    mClippingImage.setResize(mSize.x() * 0.12f, mSize.y() * 0.12f);
+    mClippingImage.setKeepRatio(true);
     mClippingImage.setOrigin(0.5, 0.5);
   }
 
   mRecalboxLogo.setImage(Path(":/Recalbox_logo_White.svg"));
   mRecalboxLogo.setOrigin(1, 0);
   mRecalboxLogo.setPosition(mSize.x() - horizontalPadding, 0 + horizontalPadding);
-  mRecalboxLogo.setMaxSize(mSize.x() * 0.09f, mSize.x() * 0.09f);
+  mRecalboxLogo.setResize(mSize.x() * 0.09f, mSize.x() * 0.09f);
+  mRecalboxLogo.setKeepRatio(true);
   mRecalboxLogo.setZIndex(50);
   mRecalboxLogo.setDefaultZIndex(50);
 
@@ -129,7 +131,8 @@ void GameClipContainer::initComponents()
 
   mImage.setOrigin(0, 1);
   mImage.setPosition(mSize.x() * 0.025f, mSize.y() * 0.92f);
-  mImage.setMaxSize(mSize.x() * 0.2f, mSize.y() * 0.4f);
+  mImage.setResize(mSize.x() * 0.2f, mSize.y() * 0.4f);
+  mImage.setKeepRatio(true);
   mImage.setZIndex(50);
   mImage.setDefaultZIndex(40);
 
@@ -145,7 +148,8 @@ void GameClipContainer::initComponents()
   mFavoriteIcon.setImage(Path(":/heart_filled.svg"));
   mFavoriteIcon.setOrigin(0, 1);
   mFavoriteIcon.setPosition(mSize.x() * 0.975f, mSize.y() * 0.91f);
-  mFavoriteIcon.setMaxSize(mSize.x() * 0.018f, mSize.x() * 0.018f);
+  mFavoriteIcon.setResize(mSize.x() * 0.018f, mSize.x() * 0.018f);
+  mFavoriteIcon.setKeepRatio(true);
   mFavoriteIcon.setZIndex(50);
   mFavoriteIcon.setDefaultZIndex(50);
 

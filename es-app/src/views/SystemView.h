@@ -103,14 +103,10 @@ class SystemView : public IList<SystemViewData, SystemData*>
      */
     SystemData* LookupSystemByName(const String& name);
 
-    [[nodiscard]] SystemData& CurrentSystem() const { return *mCurrentSystem; }
-
     SystemData* Prev();
     void RemoveCurrentSystem();
     void Sort();
     void onCursorChanged(const CursorState& state) override;
-
-    void manageTate(bool remove = false);
 
   private:
     //! SystemManager instance

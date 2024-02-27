@@ -78,7 +78,7 @@ void GuiMenuThemeOptions::OptionListComponentChanged(int id, int index, const St
   }
 }
 
-void GuiMenuThemeOptions::SwitchComponentChanged(int id, bool status)
+void GuiMenuThemeOptions::SwitchComponentChanged(int id, bool& status)
 {
   if ((Components)id == Components::Carousel)
     RecalboxConf::Instance().SetThemeCarousel(status).Save();

@@ -1,9 +1,7 @@
 #include <hardware/Board.h>
 #include <cstring>
-#include <utils/Log.h>
-#include <utils/Files.h>
-#include <input/InputCompactEvent.h>
 #include <hardware/boards/odroidadvancego2/OdroidAdvanceGo2Board.h>
+#include <hardware/boards/anbernic/RG351VBoard.h>
 #include <hardware/boards/anbernic/RG353XBoard.h>
 #include <sys/utsname.h>
 #include <hardware/boards/NullBoard.h>
@@ -11,6 +9,7 @@
 #include <hardware/boards/pis/PiBoard.h>
 #include "hardware/crt/CrtAdapterDetector.h"
 #include "hardware/crt/CrtNull.h"
+#include "utils/Files.h"
 #include <hardware/boards/pi400/Pi400Board.h>
 
 Board::Board(IHardwareNotifications& notificationInterface)
@@ -21,6 +20,9 @@ Board::Board(IHardwareNotifications& notificationInterface)
   , mBoard(GetBoardInterface(mSender))
   , mCrtBoard(GetCrtBoard())
 {
+  if(mCrtBoard.GetCrtAdapter() != CrtAdapterType::None)
+    { LOG(LogInfo) << "[CRT] Detected CRT Adapter: " << mCrtBoard.Name(); }
+
 }
 
 IBoardInterface& Board::GetBoardInterface(HardwareMessageSender& messageSender)
@@ -28,6 +30,11 @@ IBoardInterface& Board::GetBoardInterface(HardwareMessageSender& messageSender)
   BoardType model = GetBoardType();
   switch(model)
   {
+    case BoardType::RG351V: // might need adaptation!
+    {
+      { LOG(LogInfo) << "[Hardware] Anbernic RG351V."; }
+      return *(new RG351VBoard(messageSender, model));
+    }
     case BoardType::OdroidAdvanceGo:
     {
       { LOG(LogInfo) << "[Hardware] Odroid Advance Go 1/2 detected."; }
@@ -36,6 +43,11 @@ IBoardInterface& Board::GetBoardInterface(HardwareMessageSender& messageSender)
     case BoardType::OdroidAdvanceGoSuper:
     {
       { LOG(LogInfo) << "[Hardware] Odroid Advance Go Super detected."; }
+      return *(new OdroidAdvanceGo2Board(messageSender, model));
+    }
+    case BoardType::RG351P:
+    {
+      { LOG(LogInfo) << "[Hardware] Anbernic RG351P/M detected."; }
       return *(new OdroidAdvanceGo2Board(messageSender, model));
     }
     case BoardType::RG353P:
@@ -54,13 +66,14 @@ IBoardInterface& Board::GetBoardInterface(HardwareMessageSender& messageSender)
     }
     case BoardType::UndetectedYet: { LOG(LogInfo) << "[Hardware] Undetected hardware."; break; }
     case BoardType::Unknown: { LOG(LogInfo) << "[Hardware] Unknown hardware."; break; }
-    case BoardType::Pi0: { LOG(LogInfo) << "[Hardware] Raspberry Pi Zero detected."; return *(new PiBoard(messageSender)); }
-    case BoardType::Pi02: { LOG(LogInfo) << "[Hardware] Raspberry Pi Zero 2 detected."; return *(new PiBoard(messageSender)); }
-    case BoardType::Pi1: { LOG(LogInfo) << "[Hardware] Raspberry Pi 1 detected."; return *(new PiBoard(messageSender)); }
-    case BoardType::Pi2: { LOG(LogInfo) << "[Hardware] Raspberry Pi 2 detected."; return *(new PiBoard(messageSender)); }
-    case BoardType::Pi3: { LOG(LogInfo) << "[Hardware] Raspberry Pi 3 detected."; return *(new PiBoard(messageSender)); }
-    case BoardType::Pi3plus: { LOG(LogInfo) << "[Hardware] Raspberry Pi 3B+ detected."; return *(new PiBoard(messageSender)); }
-    case BoardType::Pi4: { LOG(LogInfo) << "[Hardware] Raspberry Pi 4 detected."; return *(new PiBoard(messageSender)); }
+    case BoardType::Pi0: { LOG(LogInfo) << "[Hardware] Raspberry Pi Zero detected."; return *(new PiBoard(messageSender, BoardType::Pi0)); }
+    case BoardType::Pi02: { LOG(LogInfo) << "[Hardware] Raspberry Pi Zero 2 detected."; return *(new PiBoard(messageSender,BoardType::Pi02)); }
+    case BoardType::Pi1: { LOG(LogInfo) << "[Hardware] Raspberry Pi 1 detected."; return *(new PiBoard(messageSender, BoardType::Pi1)); }
+    case BoardType::Pi2: { LOG(LogInfo) << "[Hardware] Raspberry Pi 2 detected."; return *(new PiBoard(messageSender, BoardType::Pi2)); }
+    case BoardType::Pi3: { LOG(LogInfo) << "[Hardware] Raspberry Pi 3 detected."; return *(new PiBoard(messageSender, BoardType::Pi3)); }
+    case BoardType::Pi3plus: { LOG(LogInfo) << "[Hardware] Raspberry Pi 3B+ detected."; return *(new PiBoard(messageSender, BoardType::Pi3plus)); }
+    case BoardType::Pi4: { LOG(LogInfo) << "[Hardware] Raspberry Pi 4 detected."; return *(new PiBoard(messageSender, BoardType::Pi4)); }
+    case BoardType::Pi5: { LOG(LogInfo) << "[Hardware] Raspberry Pi 5 detected."; return *(new PiBoard(messageSender, BoardType::Pi5)); }
     case BoardType::Pi400:
     {
       { LOG(LogInfo) << "[Hardware] Pi 400 detected."; }
@@ -125,6 +138,7 @@ BoardType Board::GetPiModel(unsigned int revision)
     case RaspberryModel::FourB:
     case RaspberryModel::FourCM4: return BoardType::Pi4;
     case RaspberryModel::FourHundred: return BoardType::Pi400;
+    case RaspberryModel::FiveB: return BoardType::Pi5;
     case RaspberryModel::Alpha:
     default: break;
   }
@@ -132,8 +146,9 @@ BoardType Board::GetPiModel(unsigned int revision)
   return BoardType::UnknownPi;
 }
 
-#define CPU_INFO_FILE   "/proc/cpuinfo"
+
 #define REVISION_STRING "Revision"
+#define MODEL_STRING "Model"
 #define HARDWARE_STRING "Hardware"
 
 #define SizeLitteral(x) (sizeof(x) - 1)
@@ -161,76 +176,41 @@ BoardType Board::GetBoardType()
   // Then try CPU info
   String hardware;
   String revision;
+  String model;
   mType = BoardType::Unknown;
 
-  FILE* f = fopen(CPU_INFO_FILE, "r");
-  if (f != nullptr)
-  {
-    char line[1024];
-    String str; // Declared before loop to keep memory allocated
-    while (fgets(line, sizeof(line) - 1, f) != nullptr)
+  // Pre-identification data
+  String left;
+  String right;
+  for(const String& line : Files::LoadAllFileLines(Path("/proc/cpuinfo"/* "/tmp/cpuinfo"*/)))
+    if (line.Extract(':', left, right, true))
     {
-      // Raspberry pi or Anbernic
-      if (strncmp(line, HARDWARE_STRING, SizeLitteral(HARDWARE_STRING)) == 0)
-      {
-        char* colon = strchr(line, ':');
-        if (colon != nullptr)
-        {
-          hardware = colon + 2;
-          hardware.erase(hardware.find_last_not_of(" \t\r\n") + 1);
-          { LOG(LogInfo) << "[Hardware] Hardware " << hardware; }
-        }
-
-        if (hardware == "Anbernic RG353P")
-        {
-          { LOG(LogInfo) << "[Hardware] Anbernic RG353P" ; }
-          mType = BoardType::RG353P;
-        }
-        if (hardware == "Anbernic RG353V")
-        {
-          { LOG(LogInfo) << "[Hardware] Anbernic RG353V" ; }
-          mType = BoardType::RG353V;
-        }
-        if (hardware == "Anbernic RG353M")
-        {
-          { LOG(LogInfo) << "[Hardware] Anbernic RG353M" ; }
-          mType = BoardType::RG353M;
-        }
-        if (hardware == "Anbernic RG503")
-        {
-          { LOG(LogInfo) << "[Hardware] Anbernic RG503" ; }
-          mType = BoardType::RG503;
-        }
-      }
-      if (strncmp(line, REVISION_STRING, SizeLitteral(REVISION_STRING)) == 0)
-      {
-        char* colon = strchr(line, ':');
-        if (colon != nullptr)
-        {
-          revision = colon + 2;
-          revision.erase(revision.find_last_not_of(" \t\r\n") + 1);
-          unsigned int irevision = (int) strtol(colon + 2, nullptr, 16); // Convert hexa revision
-
-          if ((hardware == "BCM2835") || (hardware == "BCM2711"))
-          {
-            { LOG(LogInfo) << "[Hardware] Pi revision " << revision; }
-            mType = GetPiModel(irevision);
-            mMemory = GetPiMemory(irevision);
-          }
-          if (hardware == "Hardkernel ODROID-GO3")
-          {
-            { LOG(LogInfo) << "[Hardware] Odroid Advance Go Super revision " << revision; }
-            mType = BoardType::OdroidAdvanceGoSuper;
-          }
-          if ((hardware == "Hardkernel ODROID-GO2") || (hardware == "Hardkernel ODROID-GO1") || (hardware == "Hardkernel ODROID-GO"))
-          {
-            { LOG(LogInfo) << "[Hardware] Odroid Advance Go 1/2 revision " << revision; }
-            mType = BoardType::OdroidAdvanceGo;
-          }
-        }
-      }
+      if (left == HARDWARE_STRING) hardware = right;
+      if (left == MODEL_STRING) model = right;
+      if (left == REVISION_STRING) revision = right;
     }
-    fclose(f);
+
+  // Identification
+  if      (hardware == "Anbernic RG351V") { LOG(LogInfo) << "[Hardware] Anbernic RG351V"; mType = BoardType::RG351V; }
+  else if (hardware == "Anbernic RG351P") { LOG(LogInfo) << "[Hardware] Anbernic RG351P"; mType = BoardType::RG351P; }
+  else if (hardware == "Anbernic RG353P") { LOG(LogInfo) << "[Hardware] Anbernic RG353P"; mType = BoardType::RG353P; }
+  else if (hardware == "Anbernic RG353V") { LOG(LogInfo) << "[Hardware] Anbernic RG353V"; mType = BoardType::RG353V; }
+  else if (hardware == "Anbernic RG353M") { LOG(LogInfo) << "[Hardware] Anbernic RG353M"; mType = BoardType::RG353M; }
+  else if (hardware == "Anbernic RG503")  { LOG(LogInfo) << "[Hardware] Anbernic RG503";  mType = BoardType::RG503; }
+  else if (hardware == "Hardkernel ODROID-GO3") { LOG(LogInfo) << "[Hardware] Odroid Advance Go Super revision " << revision; mType = BoardType::OdroidAdvanceGoSuper; }
+  else if ((hardware == "Hardkernel ODROID-GO2") || (hardware == "Hardkernel ODROID-GO1") || (hardware == "Hardkernel ODROID-GO"))
+  {
+    { LOG(LogInfo) << "[Hardware] Odroid Advance Go 1/2 revision " << revision; }
+    mType = BoardType::OdroidAdvanceGo;
+  }
+  else
+  {
+    if (model.LowerCase().Contains("raspberry"))
+      if (int irevision = 0; revision.Insert(0, '$').TryAsInt(irevision))
+      {
+        mType = GetPiModel(irevision);
+        mMemory = GetPiMemory(irevision);
+      }
   }
 
   return mType;
@@ -238,12 +218,12 @@ BoardType Board::GetBoardType()
 
 ICrtInterface& Board::GetCrtBoard()
 {
-  return *(CanHaveCRTBoard() ? CrtAdapterDetector::CreateCrtBoard() : new CrtNull(false));
+  return *(CanHaveCRTBoard() ? CrtAdapterDetector::CreateCrtBoard(GetBoardType()) : new CrtNull(false, GetBoardType()));
 }
 
 bool Board::CanHaveCRTBoard()
 {
-  #ifdef DEBUG
+  #if defined(DEBUG) || defined(OPTION_RECALBOX_SIMULATE_RRGBD)
   return true;
   #else
   switch(GetBoardType())
@@ -252,13 +232,16 @@ bool Board::CanHaveCRTBoard()
     case BoardType::Pi3:
     case BoardType::Pi3plus:
     case BoardType::Pi4:
-    case BoardType::Pi400: return true;
+    case BoardType::Pi400:
+    case BoardType::Pi5: return true;
     case BoardType::Pi1:
     case BoardType::Pi2:
     case BoardType::UndetectedYet:
     case BoardType::Unknown:
     case BoardType::Pi0:
     case BoardType::UnknownPi:
+    case BoardType::RG351V:
+    case BoardType::RG351P:
     case BoardType::OdroidAdvanceGo:
     case BoardType::OdroidAdvanceGoSuper:
     case BoardType::PCx86:

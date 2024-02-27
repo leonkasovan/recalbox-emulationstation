@@ -14,5 +14,12 @@ class Url
      * @return Encoded url
      */
     static String URLEncode(const String& url);
+
+    /*!
+     * @brief Decode the given url-compliant string into a plein text string
+     * @param url Url to decode
+     * @return Decoded url
+     */
+    static String URLDecode(const String& url);
 };
 

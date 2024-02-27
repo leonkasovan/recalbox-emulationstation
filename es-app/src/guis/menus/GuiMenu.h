@@ -33,7 +33,6 @@ class GuiMenu : public GuiMenuBase
       Advanced,
       Bios,
       License,
-      Log,
       Quit,
     };
 

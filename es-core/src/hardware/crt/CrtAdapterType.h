@@ -14,4 +14,6 @@ enum class CrtAdapterType
   RGBPi,     //!< RGB Pi
   Pi2Scart,  //!< Pi 2 Scart
   RGBDual,   //!w Recalbox RGB dual
+  RGBJamma,   //!w Recalbox RGB Jamma
+  RGBJammaV2, //!w Recalbox RGB Jamma old version
 };

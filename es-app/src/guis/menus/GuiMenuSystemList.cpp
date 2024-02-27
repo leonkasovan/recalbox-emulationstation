@@ -17,7 +17,7 @@ GuiMenuSystemList::GuiMenuSystemList(WindowManager& window, SystemManager& syste
   const SystemManager::List& systems = systemManager.AllSystems();
   for(int i = 0; i < (int)systems.Count(); ++i)
     if (!systems[i]->IsVirtual())
-      AddSubMenu(systems[i]->FullName(), i);
+      mMenus[systems[i]] = AddSubMenu("", i);
 }
 
 void GuiMenuSystemList::SubMenuSelected(int id)
@@ -27,4 +27,25 @@ void GuiMenuSystemList::SubMenuSelected(int id)
   if (Board::Instance().CrtBoard().IsCrtAdapterAttached())
     options = {.emulator = true, .ratio=false, .smooth=false, .rewind=true, .autosave=true, .shaders=false, .shaderSet=false};
   mWindow.pushGui(new GuiMenuSystemConfiguration(mWindow, system, mSystemManager, options));
+}
+
+void GuiMenuSystemList::onShow()
+{
+  for(auto& kv : mMenus)
+  {
+    String emulator;
+    String core;
+    String name(kv.first->FullName());
+    if (!Renderer::Instance().Is480pOrLower())
+    {
+      name.UpperCase();
+      EmulatorManager::GetSystemEmulator(*kv.first, emulator, core);
+      if (!emulator.empty())
+      {
+        name.Append(" - ").Append(emulator);
+        if (emulator != core) name.Append(' ').Append(core);
+      }
+    }
+    kv.second->setText(name);
+  }
 }

@@ -45,7 +45,7 @@ void Wasm4Downloader::DownloadAndInstall()
 
   // Download
   if (mStopAsap) return;
-  destination.Delete();
+  (void)destination.Delete();
   mTimeReference = DateTime();
   if (!mRequest.Execute(source, destination, this)) { mSender.Send(Wasm4DownloadingGameState::DownloadError); return; }
 
@@ -102,14 +102,15 @@ void Wasm4Downloader::DownloadAndInstall()
       if (game->Metadata().Image().IsEmpty() && props.png >= 0)
       {
         Path imageOutput = (output / "media" / "images" / kv.first.Filename()).ChangeExtension(".png");
-        imageOutput.Directory().CreatePath();
+        (void)imageOutput.Directory().CreatePath();
         Files::SaveFile(imageOutput, zip.Content(props.png));
         game->Metadata().SetImagePath(imageOutput);
       }
       // Author / Description / Data
       if (props.md >= 0)
       {
-        String desc, author;
+        String desc;
+        String author;
         DateTime date(0LL);
         int breakers = 0;
         for(String& line : String(zip.Content(props.md)).Split('\n'))
@@ -141,10 +142,10 @@ void Wasm4Downloader::DownloadAndInstall()
   }
 
   // Delete temp file
-  destination.Delete();
+  (void)destination.Delete();
 }
 
-void Wasm4Downloader::DownloadProgress(const Http& http, long long int currentSize, long long int expectedSize)
+void Wasm4Downloader::DownloadProgress(const HttpClient& http, long long int currentSize, long long int expectedSize)
 {
   (void)http;
   // Store data and synchronize

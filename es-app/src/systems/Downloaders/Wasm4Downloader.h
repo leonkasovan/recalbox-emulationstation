@@ -4,7 +4,7 @@
 #pragma once
 
 #include "systems/BaseSystemDownloader.h"
-#include "utils/network/Http.h"
+#include "utils/network/HttpClient.h"
 #include <utils/sync/SyncMessageSender.h>
 #include "utils/os/system/Thread.h"
 
@@ -22,7 +22,7 @@ enum class Wasm4DownloadingGameState
 
 class Wasm4Downloader : public BaseSystemDownloader
                       , private ISyncMessageReceiver<Wasm4DownloadingGameState>
-                      , private Http::IDownload
+                      , private HttpClient::IDownload
 {
   public:
     /*!
@@ -41,14 +41,14 @@ class Wasm4Downloader : public BaseSystemDownloader
      * @param currentSize downloaded bytes
      * @param expectedSize total expected bytes
      */
-    void DownloadProgress(const Http& http, long long currentSize, long long expectedSize) override;
+    void DownloadProgress(const HttpClient& http, long long currentSize, long long expectedSize) override;
 
   private:
     //! Game fetching URL
     static constexpr const char* sRepoURL = "https://gitlab.com/recalbox/packages/game-providers/wasm4/-/archive/main/wasp4-main.zip";
 
     //! Http request object
-    Http mRequest;
+    HttpClient mRequest;
 
     //! Sync messager
     SyncMessageSender<Wasm4DownloadingGameState> mSender;

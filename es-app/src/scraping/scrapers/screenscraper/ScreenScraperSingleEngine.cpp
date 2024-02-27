@@ -172,7 +172,7 @@ ScrapeResult ScreenScraperSingleEngine::RequestZipGameInfo(ScreenScraperApis::Ga
       { LOG(LogDebug) << "[ScreenScraper] MD5 of " << filePath.ToString() << " [" << game.RomPath().ToString() << "] : " << md5; }
 
       // Get crc32
-      int crc32i = zip.Crc32(0);
+      unsigned int crc32i = zip.Crc32(0);
       String crc32(crc32i, 8, String::Hexa::None);
 
       // Call!
@@ -452,6 +452,8 @@ ScreenScraperSingleEngine::DownloadAndStoreMedia(FileData& game, bool noKeep, co
                                                  const ScreenScraperApis::Game::MediaUrl::Media& mediaSource, ProtectedSet& md5Set,
                                                  bool& pathHasBeenSet)
 {
+  if (!mediaSource.IsValid()) return ScrapeResult::NotScraped;
+
   pathHasBeenSet = false;
   Path path = target / subPath / String(name).Append(' ').Append(mediaSource.mMd5).Append('.').Append(mediaSource.mFormat);
   bool exists = path.Exists();

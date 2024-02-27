@@ -15,11 +15,11 @@ const String::List& ArcadeVirtualSystems::GetVirtualArcadeSystemList()
     "atlus",
     "banpresto",
     "capcom",
-    "capcom/cps1",
-    "capcom/cps2",
-    "capcom/cps3",
+    "capcom\\cps1",
+    "capcom\\cps2",
+    "capcom\\cps3",
     "cave",
-    "dataeast",
+    "data\u00a0east",
     "exidy",
     "igs",
     "irem",
@@ -30,6 +30,7 @@ const String::List& ArcadeVirtualSystems::GetVirtualArcadeSystemList()
     "midway",
     "mitchell",
     "namco",
+    "neogeo",
     "nichibutsu",
     "nintendo",
     "nmk",
@@ -48,51 +49,53 @@ const String::List& ArcadeVirtualSystems::GetVirtualArcadeSystemList()
   return sList;
 }
 
-String ArcadeVirtualSystems::GetRealName(const String& driverName)
+const std::vector<std::pair<String, String>>& ArcadeVirtualSystems::GetVirtualArcadeSystemListExtended()
+{
+  static std::vector<std::pair<String, String>> sList
+    {
+      { "acclaim",        "Acclaim" },
+      { "atari",          "Atari" },
+      { "atlus",          "Atlus" },
+      { "banpresto",      "BanPresto" },
+      { "capcom",         "Capcom" },
+      { "capcom\\cps1",   "Camcom CPS1" },
+      { "capcom\\cps2",   "Capcom CPS2" },
+      { "capcom\\cps3",   "Capcom CPS3" },
+      { "cave",           "CAVE" },
+      { "data\u00a0east", "Data East" },
+      { "exidy",          "Exidy" },
+      { "igs",            "International Games System (I.G.S)" },
+      { "irem",           "IREM Software Engineering" },
+      { "itech",          "Incredible Technologies" },
+      { "jaleco",         "Jaleco" },
+      { "kaneko",         "Kaneko" },
+      { "konami",         "Konami" },
+      { "midway",         "Midway" },
+      { "mitchell",       "Mitchell" },
+      { "namco",          "NAMCO" },
+      { "neogeo",         "Neo-Geo" },
+      { "nichibutsu",     "Nichibutsu" },
+      { "nintendo",       "Nintendo" },
+      { "nmk",            "NML" },
+      { "sammy",          "Sammy" },
+      { "sega",           "SEGA" },
+      { "seibu",          "Seibu" },
+      { "seta",           "SETA" },
+      { "snk",            "SNK" },
+      { "taito",          "TAITO" },
+      { "technos",        "Technōs" },
+      { "tecmo",          "TECMO" },
+      { "toaplan",        "TOAPLAN" },
+      { "visco",          "VISCO" },
+    };
+
+  return sList;
+}
+
+/*String ArcadeVirtualSystems::GetRealName(const String& driverName)
 {
   static HashMap<String, String> sList
   {
-    { "acorn", "Aristocrat" },
-    { "acorn", "Eterna" },
-    { "acorn", "Icarus" },
-    { "acorn", "Sego" },
-    { "acorn", "Sisteme" },
-    { "adp", "ADP" },
-    { "alba", "Alba" },
-    { "alliedleisure", "Allied Leisure" },
-    { "alpha", "Alpha Denshi Co." },
-    { "amiga", "American Laser Games" },
-    { "amiga", "Arcadia Systems" },
-    { "amiga", "CD Express" },
-    { "amiga", "Commodore" },
-    { "amiga", "Grand Products" },
-    { "amiga", "Nova?" },
-    { "amiga", "Picmatic" },
-    { "amiga", "Sente" },
-    { "amiga", "Shangai Games" },
-    { "apple", "Nippel" },
-    { "aristocrat", "Aristocrat" },
-    { "atari", "Atari" },
-    { "atlus", "Atlus" },
-    { "barcrest", "Barcrest" },
-    { "bfm", "BFM" },
-    { "bmc", "BMC" },
-    { "capcom", "Capcom" },
-    { "ces", "Creative Electronics & Software" },
-    { "cinematronics", "Cinematronics" },
-    { "cirsa", "Cirsa" },
-    { "comad", "Comad" },
-    { "cvs", "Century Electronics" },
-    { "dataeast", "Data East" },
-    { "ddr", "VEB Polytechnik Karl-Marx-Stadt" },
-    { "dgrm", "D.G.R.M." },
-    { "dooyong", "Dooyong" },
-    { "dynax", "Dynax" },
-    { "edevices", "Electronic Devices Italy" },
-    { "efo", "E.F.O." },
-    { "eolith", "Eolith" },
-    { "excellent", "Excellent System" },
-    { "exidy", "Exidy" },
     { "f32", "F2 System" },
     { "funworld", "Fun World" },
     { "fuuki", "Fuuki" },
@@ -177,6 +180,6 @@ String ArcadeVirtualSystems::GetRealName(const String& driverName)
         return String(*result).Append(" - ").Append(driverName.SubString(separator + 1).ToUpperCaseUTF8());
 
   return driverName;
-}
+}*/
 
 

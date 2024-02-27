@@ -150,6 +150,11 @@ class IBoardInterface
     virtual void SetFrontendCPUGovernor() = 0;
 
     /*!
+    * @return if board supports vulkan
+    */
+    virtual bool HasVulkanSupport() = 0;
+
+    /*!
     * @return the rotation capabilities for tate mode
     */
     static inline RotationCapability defaultCap = {

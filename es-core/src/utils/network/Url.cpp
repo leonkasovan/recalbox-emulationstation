@@ -30,3 +30,23 @@ String Url::URLEncode(const String& url)
 
   return result;
 }
+
+String Url::URLDecode(const String& url)
+{
+  String result;
+  result.reserve(url.size()); // Allocate only once
+  const char* p = url.c_str();
+
+  for (int i = (int)url.length(); --i >= 0;)
+    if (char C = *p++; C != '%') result.Append(C);
+    else
+    {
+      char h = *p++ | 0x20; // high quartet lowercase
+      char l = *p++ | 0x20; // low quartet lowercase
+      result.Append((char)(((h <= 0x39 ? h - 0x30 : (h - 'a') + 10) << 4) | (l <= 0x39 ? l - 0x30 : (l - 'a') + 10)));
+      i -= 2;
+    }
+
+  return result;
+}
+

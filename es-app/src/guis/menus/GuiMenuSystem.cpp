@@ -35,15 +35,18 @@ GuiMenuSystem::GuiMenuSystem(WindowManager& window, SystemManager& systemManager
     case BoardType::Pi3plus:              arch = "RPi 3B+"; break;
     case BoardType::Pi4:                  arch = "RPi 4"; break;
     case BoardType::Pi400:                arch = "RPi 400"; break;
+    case BoardType::Pi5  :                arch = "RPi 5"; break;
     case BoardType::UnknownPi:            arch = "unknown RPi"; break;
     case BoardType::OdroidAdvanceGo:      arch = "Odroid GO Advance"; break;
     case BoardType::OdroidAdvanceGoSuper: arch = "Odroid GO Super"; break;
     case BoardType::PCx86:                arch = "x86"; break;
     case BoardType::PCx64:                arch = "x64"; break;
+    case BoardType::RG351P:               arch = "RG351P/M"; break;
     case BoardType::RG353P:               arch = "RG353P"; break;
     case BoardType::RG353V:               arch = "RG353V"; break;
     case BoardType::RG353M:               arch = "RG353M"; break;
     case BoardType::RG503:                arch = "RG503"; break;
+    case BoardType::RG351V:               arch = "RG351V"; break;
   }
   arch.Append(' ').Append(sizeof(void*) == 4 ? "32bits" : "64bits");
   AddText(_("VERSION"), version.Append(" (").Append(arch).Append(')'), _(MENUMESSAGE_VERSION_HELP_MSG));

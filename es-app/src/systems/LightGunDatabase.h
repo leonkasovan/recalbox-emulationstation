@@ -16,7 +16,7 @@ class LightGunDatabase : public IFilter
     LightGunDatabase();
 
     //! Current selected system
-    bool SetCurrentSystem(const SystemData& system);
+    void SetCurrentSystem(const SystemData& system);
 
   private:
     //! Xml path
@@ -25,6 +25,8 @@ class LightGunDatabase : public IFilter
     //! All game list
     HashMap<String, String::List> mSystemLists;
 
+    //! Current system
+    const SystemData* mCurrentSystem;
     //! Game list available in the current system
     String::List* mCurrentList;
 

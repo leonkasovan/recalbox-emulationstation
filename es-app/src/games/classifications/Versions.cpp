@@ -138,10 +138,10 @@ Versions::GameVersions Versions::ExtractGameVersionNoIntro(const String& filenam
 {
   for(int end = 0;;)
   {
-    int begin = (int)filename.find('(', end);
-    if (begin == (int)String::npos) break;
-    end = (int)filename.find(')', begin);
-    if (end == (int)String::npos) break;
+    int begin = filename.Find('(', end);
+    if (begin < 0) break;
+    end = filename.Find(')', begin);
+    if (end < 0) break;
 
     String tag = filename.SubString(begin +1, end - begin - 1).LowerCase();
     if (tag.empty()) break;

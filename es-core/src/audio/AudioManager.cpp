@@ -259,7 +259,7 @@ std::vector<Path> AudioManager::ListMusicInFolder(const Path& path)
 
   if (!path.IsDirectory()) return musics;
 
-  Path::PathList list = path.GetDirectoryContent();
+  Path::PathList list = path.RecurseDirectoryContent();
   for(Path& musicPath : list)
   {
     // Skip if not a file
@@ -268,7 +268,7 @@ std::vector<Path> AudioManager::ListMusicInFolder(const Path& path)
     // Skip if no match
     String ext = musicPath.Extension().LowerCase().Append('|');
     static String supportedExtensions = "|.wav|.mp3|.ogg|.flac|.midi|.mid|.mod|.s3m|.xm|.it|.669|.apun|.dsm|.far|.amf|.gdm|.imf|.med|.mtm|.okt|.stm|.stx|.ult|.uni|.opus|";
-    if (supportedExtensions.Find(ext) < 0) continue;
+    if (!supportedExtensions.Contains(ext)) continue;
 
     // File matches, store it
     musics.push_back(musicPath);

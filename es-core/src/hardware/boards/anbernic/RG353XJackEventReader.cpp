@@ -54,6 +54,15 @@ void RG353XJackEventReader::Run()
       continue;
     }
 
+    // query device for initial value
+    int initialValue;
+    if (ioctl(mFileHandle, EVIOCGSW(SW_HEADPHONE_INSERT), &initialValue) != -1) {
+      mSender.Send(BoardType::RG353V, (bool)initialValue ? MessageTypes::HeadphonePluggedIn : MessageTypes::HeadphoneUnplugged);
+      { LOG(LogDebug) << "[RG353X] Initial headphone status: " << ((bool)initialValue ? "plugged" : "unplugged"); }
+    }else
+      { LOG(LogDebug) << "[RG353X] Initial headphone status: unknown"; }
+
+
     while(IsRunning())
     {
       // Poll

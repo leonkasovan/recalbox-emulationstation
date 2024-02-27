@@ -52,7 +52,7 @@ ScreenScraperApis::GetGameInformation(const FileData& file, const String& crc32,
   {
     String url;
     if (mEndPointProvider.RequireSeparateRequests())
-      url = md5.empty() ?
+      url = md5.empty() || size == 0 ?
             mEndPointProvider.GetGameInfoUrlByName(mConfiguration.GetLogin(), mConfiguration.GetPassword(), file, md5, size) :
             mEndPointProvider.GetGameInfoUrlByMD5(mConfiguration.GetLogin(), mConfiguration.GetPassword(), file, md5, size);
     else
@@ -191,7 +191,7 @@ void ScreenScraperApis::DeserializeGameInformationInner(const rapidjson::Value& 
     const rapidjson::Value& medias = json["medias"];
 
     // Image
-    const char* type  = "mixrbv1"; // default to screenshot
+    const char* type  = "ss"; // default to screenshot
     const char* type2 = nullptr;   // No default type2
     switch (mConfiguration.GetImageType())
     {
@@ -718,7 +718,7 @@ ScrapeResult ScreenScraperApis::GetMedia(const FileData& game, const String& med
   // Delete wrong files
   if (to.Size() <= 256 || !mClient.IsOutputFileValid())
   {
-    to.Delete();
+    (void)to.Delete();
     size = 0;
   }
 

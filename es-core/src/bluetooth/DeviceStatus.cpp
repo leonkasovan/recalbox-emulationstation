@@ -14,7 +14,7 @@ DeviceStatus DeviceStatus::Deserialize(const String& message)
   json.Parse(message.data());
   if (!json.HasParseError())
   {
-    { LOG(LogDebug) << "[Bluetooth] MQTT Message: " << message; }
+    { LOG(LogTrace) << "[Bluetooth] MQTT Message: " << message; }
     bool active = json.HasMember("is_discovering") && json["is_discovering"].GetBool();
     if (active)
     {

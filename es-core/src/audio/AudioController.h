@@ -94,4 +94,9 @@ class AudioController: public StaticLifeCycleControler<AudioController>
      * @brief Enable notification sending
      */
     void EnableNotification();
+
+    /*!
+     * @brief Set the output port name from the current sink
+     */
+    void SetOutputPort(const String portName) const { mController.SetOutputPort(portName); }
 };

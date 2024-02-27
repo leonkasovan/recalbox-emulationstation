@@ -232,6 +232,7 @@ static WINDOW *main_win = NULL;
 
 static void sigint_handler (int signal) /* {{{ */
 {
+  (void)signal;
 	/* Make compiler happy */
 	signal = 0;
 	/* Exit the loop */
@@ -439,7 +440,7 @@ static int ping_initialize_contexts (pingobj_t *ping) /* {{{ */
 		/* start new hosts at the same graph point as old hosts */
 		context->history_size = history_size;
 		context->history_index = history_size;
-		for (i = 0; i < history_size; i++)
+		for (i = 0; i < (int)history_size; i++)
 			context->history_by_time[i] = -1;
 
 		buffer_size = sizeof (context->host);

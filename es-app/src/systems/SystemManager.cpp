@@ -13,7 +13,6 @@
 #include <utils/os/system/ThreadPool.h>
 #include <utils/os/fs/StringMapFile.h>
 #include <utils/Files.h>
-#include <utils/locale/LocaleHelper.h>
 #include <dirent.h>
 
 SystemManager::RomSources SystemManager::GetRomSource(const SystemDescriptor& systemDescriptor, PortTypes port)
@@ -199,7 +198,7 @@ void SystemManager::BuildDynamicMetadata(SystemData& system)
 void SystemManager::MakeSystemVisible(SystemData* system)
 {
   int index = 0;
-  for(int i = 0; index < mAllSystems.Count() && mAllSystems[index] != system; ++i)
+  for(int i = 0; i < mAllSystems.Count() && mAllSystems[i] != system; ++i)
     if (mAllSystems[i] == mVisibleSystems[index])
       if (++index >= mVisibleSystems.Count())
         break;
@@ -211,13 +210,13 @@ void SystemManager::MakeSystemInvisible(SystemData* system)
   mVisibleSystems.Remove(system);
 }
 
-void SystemManager::InitializeSystem(SystemData* system, bool initializeOnly)
+void SystemManager::InitializeSystem(SystemData* system)
 {
   // Initialize only once
   if (system->IsInitialized()) return;
 
   // Try to populate!
-  if (!initializeOnly)
+  if (!system->HasGame())
   {
     if (system->IsVirtual()) PopulateVirtualSystem(system);
     else PopulateRegularSystem(system);
@@ -240,8 +239,9 @@ void SystemManager::InitializeSystem(SystemData* system, bool initializeOnly)
       if (system->Descriptor().IsTrueArcade())
         system->LoadArcadeDatabase();
     }
-    // Load theme
-    system->loadTheme();
+    // Load theme (not for port games)
+    if (!system->IsPorts())
+      system->loadTheme();
 
     // Set initialised
     system->SetInitialized();
@@ -316,7 +316,7 @@ void SystemManager::PopulatePortsSystem(SystemData* systemPorts)
     // Lookup all non-empty arcade platforms
     List ports;
     FileData::StringMap doppelganger;
-    for (SystemData* system : mVisibleSystems)
+    for (SystemData* system : mAllSystems)
       if (system->Descriptor().IsPort() && system->HasGame())
       {
         ports.Add(system);
@@ -365,25 +365,30 @@ void SystemManager::PopulateMultiPlayerSystem(SystemData* systemMultiPlayer)
       }
   } filter;
 
-  if (RecalboxConf::Instance().GetCollectionLastPlayed())
+  if (RecalboxConf::Instance().GetCollectionMultiplayer())
     PopulateMetaSystemWithFilter(systemMultiPlayer, &filter, nullptr);
 }
 
 void SystemManager::PopulateAllGamesSystem(SystemData* systemAllGames)
 {
-  FileData::StringMap doppelganger;
-  for (SystemData* system : mVisibleSystems)
-    system->BuildDoppelgangerMap(doppelganger, false);
-
   if (RecalboxConf::Instance().GetCollectionAllGames())
-    PopulateVirtualSystemWithSystem(systemAllGames, mVisibleSystems, doppelganger, true);
+  {
+    FileData::StringMap doppelganger;
+    for (SystemData* system: mAllSystems)
+      if (!system->IsVirtual())
+        system->BuildDoppelgangerMap(doppelganger, false);
+
+    PopulateVirtualSystemWithSystem(systemAllGames, mAllSystems, doppelganger, true);
+  }
 }
 
 void SystemManager::PopulateLightgunSystem(SystemData* systemLightGun)
 {
-  LightGunDatabase database;
   if (RecalboxConf::Instance().GetCollectionLightGun())
+  {
+    LightGunDatabase database;
     PopulateMetaSystemWithFilter(systemLightGun, &database, nullptr);
+  }
 }
 
 void SystemManager::PopulateTateSystem(SystemData* systemTate)
@@ -411,7 +416,7 @@ void SystemManager::PopulateArcadeSystem(SystemData* systemArcade)
     List candidates;
     FileData::StringMap doppelganger;
     bool includeNeogeo = RecalboxConf::Instance().GetCollectionArcadeNeogeo();
-    for (SystemData* arcade: mVisibleSystems)
+    for (SystemData* arcade: mAllSystems)
       if (arcade->Descriptor().IsTrueArcade() || (includeNeogeo && arcade->Descriptor().Name() == "neogeo"))
       {
         candidates.Add(arcade);
@@ -421,7 +426,6 @@ void SystemManager::PopulateArcadeSystem(SystemData* systemArcade)
       }
 
     PopulateVirtualSystemWithSystem(systemArcade, candidates, doppelganger, true);
-    ManageArcadeVirtualSystem();
   }
 }
 
@@ -443,10 +447,10 @@ void SystemManager::PopulateGenreSystem(SystemData* systemGenre)
   };
 
   // Lookup genre
-  GameGenres genre = Genres::LookupFromName(systemGenre->Name());
+  GameGenres genre = Genres::LookupFromName(String(systemGenre->Name()).Remove(sGenrePrefix));
   if (genre == GameGenres::None) { LOG(LogError) << "[SystemManager] Unable to lookup system genre!"; abort(); }
 
-  if (RecalboxConf::Instance().GetCollection(Genres::GetShortName(genre)))
+  if (RecalboxConf::Instance().IsInCollectionGenre(BuildGenreSystemName(genre)))
   {
     Filter filter(genre);
     PopulateMetaSystemWithFilter(systemGenre, &filter, nullptr);
@@ -461,49 +465,23 @@ void SystemManager::PopulateArcadeManufacturersSystem(SystemData* system)
       const ArcadeDatabaseManager& mArcadeDatabaseManager;
       const ArcadeDatabase* mDatabase;
       const FolderData* mParent;
-      String mDriverName;
-      ArcadeDatabase::IndexList* mDriverIndexes;
-      HashMap<const ArcadeDatabase*, ArcadeDatabase::IndexList*> mDriverIndexesFastLookup;
+      String mManufacturerName;
+      int mManufacturerIndex;
+      HashMap<const ArcadeDatabase*, int> mManufacturerIndexesFastLookup;
 
     public:
       /*!
        * @brief Constructor
        * @param arcadeDatabaseManager Database manager from witch to retrieve arcade database
-       * @param driverName Driver name to lookup for games matching this driver
+       * @param manufacturerName manufacturer name to lookup for games matching this manufacturer
        */
-      explicit Filter(const ArcadeDatabaseManager& arcadeDatabaseManager, const String& driverName)
+      explicit Filter(const ArcadeDatabaseManager& arcadeDatabaseManager, const String& manufacturerName)
         : mArcadeDatabaseManager(arcadeDatabaseManager)
         , mDatabase(nullptr)
         , mParent(nullptr)
-        , mDriverName(driverName)
-        , mDriverIndexes(nullptr)
+        , mManufacturerName(manufacturerName)
+        , mManufacturerIndex(-1)
       {
-      }
-
-      //! Destrutor - destroy index caches
-      ~Filter() override
-      {
-        for(const auto& kv : mDriverIndexesFastLookup)
-          delete kv.second;
-      }
-
-      /*!
-       * @brief Optimized driver lookup in index list
-       * @param driver raw driver index
-       * @return bool if driver is in the last driver list, false otherwise
-       */
-      bool LookupDriver(int driver)
-      {
-        int count = (int)mDriverIndexes->Count();
-        // Optimized case for only one driver
-        if (count == 1 && ((*mDriverIndexes)[0] == driver)) return true;
-        // Multiple driver
-        for(int i = (count-- + 1) >> 1; --i >= 0; )
-        {
-          if ((*mDriverIndexes)[i] == driver) return true;
-          if ((*mDriverIndexes)[count - i] == driver) return true;
-        }
-        return false;
       }
 
       /*!
@@ -514,19 +492,20 @@ void SystemManager::PopulateArcadeManufacturersSystem(SystemData* system)
       [[nodiscard]] bool ApplyFilter(const FileData& file) override
       {
         // Update the database regarding the emulator configured for the current Folder
-        // After the database is updated, lookup the driver index regarding the driver name.
-        // If neither no database, nor driver index is found, ignore the current game
+        // After the database is updated, lookup the manufacturer index regarding the manufacturer name.
+        // If neither no database, nor manufacturer index is found, ignore the current game
         if (mDatabase == nullptr || mParent != file.Parent())
         {
           if (mDatabase = mArcadeDatabaseManager.LookupDatabase(*(mParent = file.Parent())); mDatabase != nullptr)
           {
-            if (ArcadeDatabase::IndexList** cacheList = mDriverIndexesFastLookup.try_get(mDatabase); cacheList != nullptr) mDriverIndexes = *cacheList;
-            else mDriverIndexesFastLookup[mDatabase] = (mDriverIndexes = new ArcadeDatabase::IndexList(mDatabase->RawDriverIndexesFromFamilly(mDriverName)));
+            if (int* cacheList = mManufacturerIndexesFastLookup.try_get(mDatabase); cacheList != nullptr) mManufacturerIndex = *cacheList;
+            else mManufacturerIndexesFastLookup[mDatabase] = (mManufacturerIndex = mDatabase->RawManufacturerIndexFromName(
+                mManufacturerName));
           }
-          if (mDatabase == nullptr) return false; // No database for the current folder
+          else return false; // No database for the current folder
         }
         // Valid data?
-        if (mDriverIndexes->Empty()) return false; // No driver
+        if (mManufacturerIndex < 0) return false; // No manufacturer
 
         // Lookup the current game in the arcade database
         const ArcadeGame* arcade = mDatabase->LookupGame(file);
@@ -534,13 +513,13 @@ void SystemManager::PopulateArcadeManufacturersSystem(SystemData* system)
         if (arcade == nullptr) return false;
         // Not a regular arcade game?
         if (arcade->Hierarchy() == ArcadeGame::Type::Bios) return false;
-        // Finally, compare the driver index. If it's the right index, we got a game!
-        return LookupDriver(arcade->RawDriver());
+        // Finally, compare the manufacturer index. If it's the right index, we got a game!
+        return arcade->RawManufacturer().Contains(mManufacturerIndex);
       }
   };
 
-  String manufacturer = system->Name();
-  String identifier = String(manufacturer).Replace('/', '-');
+  String identifier = system->Name();
+  String manufacturer(identifier); manufacturer.Remove(sArcadeManufacturerPrefix).Replace('-', '\\');
   if (RecalboxConf::Instance().IsInCollectionArcadeManufacturers(identifier))
   {
     // Filter and insert items
@@ -573,7 +552,7 @@ void SystemManager::PopulateMetaSystemWithFilter(SystemData* system, IFilter* fi
   // Filter and insert items
   FileData::List allGames;
   FileData::StringMap doppelganger;
-  for (SystemData* regular : mVisibleSystems)
+  for (SystemData* regular : mAllSystems)
     if (!regular->IsVirtual())
     {
       for (const RootFolderData* root : regular->MasterRoot().SubRoots())
@@ -603,15 +582,13 @@ void SystemManager::PopulateVirtualSystemWithSystem(SystemData* system, const Li
 {
   RootFolderData& root = system->LookupOrCreateRootFolder(Path(), RootFolderData::Ownership::FolderOnly, RootFolderData::Types::Virtual);
   for(SystemData* source : systems)
-  {
-    FileData::List all = includesubfolder ? source->getAllGames() : source->getTopGamesAndFolders();
-    if (!all.empty())
-    {
-      { LOG(LogWarning) << "[System] Add games from " << source->Name() << " into " << system->FullName(); }
-      for (auto* fd : all)
-        system->LookupOrCreateGame(root, fd->TopAncestor().RomPath(), fd->RomPath(), fd->Type(), doppelganger);
-    }
-  }
+    if (!source->IsVirtual())
+      if (FileData::List all = includesubfolder ? source->getAllGames() : source->getTopGamesAndFolders(); !all.empty())
+      {
+        { LOG(LogWarning) << "[System] Add games from " << source->Name() << " into " << system->FullName(); }
+        for (auto* fd : all)
+          system->LookupOrCreateGame(root, fd->TopAncestor().RomPath(), fd->RomPath(), fd->Type(), doppelganger);
+      }
 }
 
 void SystemManager::PopulateVirtualSystemWithGames(SystemData* system, const FileData::List& games, FileData::StringMap& doppelganger)
@@ -631,9 +608,10 @@ SystemData* SystemManager::CreateRegularSystem(const SystemDescriptor& systemDes
   SystemData::Properties properties = SystemData::Properties::Searchable;
   if (systemDescriptor.Name() == "pico8") properties |= SystemData::Properties::GameInPng;
   if (systemDescriptor.Name() == "imageviewer") properties = SystemData::Properties::GameInPng | SystemData::Properties::ScreenShots;
+  if (systemDescriptor.IsPort()) properties |= SystemData::Properties::Ports;
 
   SystemData* result = new SystemData(*this, systemDescriptor, properties);
-  InitializeSystem(result, false);
+  InitializeSystem(result);
 
   return result;
 }
@@ -738,7 +716,7 @@ SystemData* SystemManager::CreateGenreSystem(GameGenres genre)
   SystemDescriptor descriptor;
   String shortName = Genres::GetShortName(genre);
   String fullName = Genres::GetFullName(genre);
-  descriptor.SetSystemInformation(String("475b94da-8fbc-488d-82df-554161af2997").Append(shortName), shortName, fullName)
+  descriptor.SetSystemInformation(String("475b94da-8fbc-488d-82df-554161af2997").Append(shortName), BuildGenreSystemName(genre), fullName)
             .SetPropertiesInformation("virtual", "no", "no", "no", "2020-01-01", "None", false, false, false, "")
             .SetDescriptorInformation("", "", String("auto-").Append(shortName), "", "", false, false, false);
   SystemData* result = new SystemData(*this, descriptor, SystemData::Properties::Virtual | SystemData::Properties::AlwaysFlat, MetadataType::GenreId, VirtualSystemType::Genre);
@@ -749,28 +727,54 @@ SystemData* SystemManager::CreateGenreSystem(GameGenres genre)
 SystemData* SystemManager::CreateArcadeManufacturersSystem(const String& manufacturer)
 {
   SystemDescriptor descriptor;
-  String fullName = ArcadeVirtualSystems::GetRealName(manufacturer);
-  descriptor.SetSystemInformation(String("475b94da-8fbc-488d-82df-554161af2997").Append(manufacturer), manufacturer, fullName)
+  if (manufacturer.Contains("data"))
+    printf("ga\n");
+  descriptor.SetSystemInformation(String("475b94da-8fbc-488d-82df-554161af2997").Append(manufacturer), BuildArcadeManufacturerSystemName(manufacturer), String(manufacturer).Replace('\\', " - "))
             .SetPropertiesInformation("varcade", "no", "no", "no", "2020-01-01", "None", false, false, false, "")
-            .SetDescriptorInformation("", "", String("auto-arcade-").Append(manufacturer).Replace('/','-'), "", "", false, false, false);
+            .SetDescriptorInformation("", "", String("auto-arcade-").Append(manufacturer).Replace('\\','-').Remove("\u00A0"), "", "", false, false, false);
   SystemData* result = new SystemData(*this, descriptor, SystemData::Properties::Virtual | SystemData::Properties::AlwaysFlat, MetadataType::None, VirtualSystemType::ArcadeManufacturers);
-
   return result;
 }
 
-void SystemManager::ManageArcadeVirtualSystem()
+void SystemManager::ManageArcadeVirtualSystem(bool startup)
 {
-  bool arcadeVirtual = RecalboxConf::Instance().GetCollectionArcade();
-  if (!arcadeVirtual) return;
-
+  List added;
+  List removed;
+  bool arcadeColectionOn = RecalboxConf::Instance().GetCollectionArcade();
   bool hideOriginals = RecalboxConf::Instance().GetCollectionArcadeHideOriginals();
   bool includeNeogeo = RecalboxConf::Instance().GetCollectionArcadeNeogeo();
-  for (int i = mVisibleSystems.Count(); --i>= 0; )
-    if (SystemData* arcade = mVisibleSystems[i]; arcade->Descriptor().IsTrueArcade() || (includeNeogeo && arcade->Descriptor().Name() == "neogeo"))
+  // All arcade systems
+  for (int i = mAllSystems.Count(); --i >= 0;)
+    if (SystemData* arcade = mAllSystems[i]; arcade->Descriptor().IsTrueArcade())
     {
-      if (hideOriginals) MakeSystemInvisible(arcade);
-      else MakeSystemVisible(arcade);
+      bool isVisible = mVisibleSystems.Contains(arcade);
+      if (arcadeColectionOn)
+        if (hideOriginals)
+          if (includeNeogeo || arcade->Descriptor().Name() != "neogeo")
+          {
+            if (isVisible) removed.Add(arcade);
+            continue;
+          }
+      if (arcade->HasVisibleGame()) { if (!isVisible) added.Add(arcade); }
+      else if (isVisible) removed.Add(arcade);
     }
+
+  // Neogeo exception
+  if (includeNeogeo)
+    for (int i = mAllSystems.Count(); --i >= 0;)
+      if (SystemData* arcade = mAllSystems[i]; arcade->Descriptor().Name() == "neogeo")
+      {
+        bool isVisible = mVisibleSystems.Contains(arcade);
+        if (isVisible) removed.Add(arcade);
+        if (arcade->HasVisibleGame()) { if (!isVisible) added.Add(arcade); }
+        else if (isVisible) removed.Add(arcade);
+      }
+
+  if (!startup)
+    ApplySystemChanges(&added, &removed, nullptr, false);
+  else
+    for(SystemData* systemToHide : removed)
+      MakeSystemInvisible(systemToHide);
 }
 
 void SystemManager::ManagePortsVirtualSystem()
@@ -794,9 +798,6 @@ SystemData* SystemManager::ThreadPoolRunJob(SystemDescriptor& systemDescriptor)
   try
   {
     SystemData* newSys = CreateRegularSystem(systemDescriptor);
-    mEmulatorGuard.Lock();
-    mEmulatorManager.AddEmulatorList(*newSys);
-    mEmulatorGuard.UnLock();
     { LOG(LogWarning) << "[System] Adding \"" << systemDescriptor.Name() << "\" in system list."; }
     return newSys;
   }
@@ -821,8 +822,8 @@ bool SystemManager::LoadSystemConfigurations(FileNotifier& gamelistWatcher, bool
 {
   mForceReload = forceReloadFromDisk;
 
-  // Phase #1
-  NotifyLoadingPhase(ISystemLoadingPhase::Phase::RegularSystems);
+  // Remove any existing system & save (useful to save autorun game metadata)
+  DeleteAllSystems(true);
 
   SystemDeserializer deserializer;
   bool loaded = deserializer.LoadSystems();
@@ -833,6 +834,41 @@ bool SystemManager::LoadSystemConfigurations(FileNotifier& gamelistWatcher, bool
     return false;
   }
 
+  DescriptorList list;
+  for (int index = 0; index < deserializer.Count(); ++index)
+    if (SystemDescriptor descriptor; deserializer.Deserialize(index, descriptor))
+      list.push_back(descriptor);
+
+  return LoadSystems(list, &gamelistWatcher, portableSystem, false);
+}
+
+bool SystemManager::LoadSingleSystemConfigurations(const String& UUID)
+{
+  mForceReload = false;
+
+  SystemDeserializer deserializer;
+  bool loaded = deserializer.LoadSystems();
+  // Is there at least
+  if (!loaded)
+  {
+    { LOG(LogError) << "[System] No systemlist.xml file available!"; }
+    return false;
+  }
+
+  DescriptorList list;
+  for (int index = 0; index < deserializer.Count(); ++index)
+    if (SystemDescriptor descriptor; deserializer.Deserialize(index, descriptor))
+      if (descriptor.GUID() == UUID)
+        list.push_back(descriptor);
+
+  return LoadSystems(list, nullptr, false, true);
+}
+
+bool SystemManager::LoadSystems(const DescriptorList& systemList, FileNotifier* gamelistWatcher, bool portableSystem, bool novirtuals)
+{
+  // Phase #1
+  NotifyLoadingPhase(ISystemLoadingPhase::Phase::RegularSystems);
+
   DateTime start;
 
   // Get weight store
@@ -842,24 +878,17 @@ bool SystemManager::LoadSystemConfigurations(FileNotifier& gamelistWatcher, bool
   ThreadPool<SystemDescriptor, SystemData*> threadPool(this, "System-Load", false, 20);
   // Push system to process
   mSystemNameToSystemRootPath.clear();
-  for (int index = 0; index < deserializer.Count(); ++index)
-  {
-    // Create system descriptor
-    SystemDescriptor descriptor;
-    if (deserializer.Deserialize(index, descriptor))
+  for (const SystemDescriptor& descriptor : systemList)
+    if (!RecalboxConf::Instance().AsBool(descriptor.Name() + ".ignore"))
     {
-      if (!RecalboxConf::Instance().AsBool(descriptor.Name() + ".ignore"))
-      {
-        // Store root path
-        mSystemNameToSystemRootPath[descriptor.RomPath().ToString()] = descriptor.Extension();
-        // Get weight
-        int weight = weights.GetInt(descriptor.FullName(), 0);
-        // Push weighted system
-        threadPool.PushFeed(descriptor, weight);
-      }
-      else { LOG(LogInfo) << "[System] " << descriptor.FullName() << " ignored in configuration."; }
+      // Store root path
+      mSystemNameToSystemRootPath[descriptor.RomPath().ToString()] = descriptor.Extension();
+      // Get weight
+      int weight = weights.GetInt(descriptor.FullName(), 0);
+      // Push weighted system
+      threadPool.PushFeed(descriptor, weight);
     }
-  }
+    else { LOG(LogInfo) << "[System] " << descriptor.FullName() << " ignored in configuration."; }
 
   // Initialize external mount points first so that they can be used in system loading
   InitializeMountPoints();
@@ -879,7 +908,7 @@ bool SystemManager::LoadSystemConfigurations(FileNotifier& gamelistWatcher, bool
   mAllSystems.ExpandTo(count);
   mVisibleSystems.Clear();
   for(SystemData* result = nullptr; threadPool.PopResult(result, index); )
-    //if (result != nullptr)
+    if (result != nullptr)
     {
       mAllSystems(index) = result;
       if (result->HasVisibleGame()) mVisibleSystems.Add(result);
@@ -897,18 +926,23 @@ bool SystemManager::LoadSystemConfigurations(FileNotifier& gamelistWatcher, bool
   // Phase #2
   NotifyLoadingPhase(ISystemLoadingPhase::Phase::VirtualSystems);
 
-  // Load virtual systems
-  LoadVirtualSystemConfigurations(portableSystem);
+  if (!novirtuals)
+  {
+    // Load virtual systems
+    LoadVirtualSystems(systemList, portableSystem);
 
-  // Remove raw ports
-  ManagePortsVirtualSystem();
+    // Remove required systems
+    ManagePortsVirtualSystem();
+    ManageArcadeVirtualSystem(true);
+  }
 
   // Sort systems based on conf option
   mOriginalOrderedSystems = mAllSystems;
   SystemSorting();
 
   // Add gamelist watching
-  WatchGameList(gamelistWatcher);
+  if (gamelistWatcher != nullptr)
+    WatchGameList(*gamelistWatcher);
 
   // Finalize arcade loading
   ArcadeDatabaseManager::Finalize();
@@ -917,42 +951,83 @@ bool SystemManager::LoadSystemConfigurations(FileNotifier& gamelistWatcher, bool
   NotifyLoadingPhase(ISystemLoadingPhase::Phase::Completed);
   ThreadPoolTick(1, 1);
 
-  return true;
+  return mVisibleSystems.Count() != 0;
 }
 
-void SystemManager::LoadVirtualSystemConfigurations(bool portableSystem)
+bool SystemManager::VirtualSystemNeedRefresh(const DescriptorList& systemList, VirtualSystemType type) const
+{
+  switch(type)
+  {
+    case VirtualSystemType::Favorites:
+    case VirtualSystemType::LastPlayed:
+    case VirtualSystemType::Multiplayers:
+    case VirtualSystemType::AllGames:
+    case VirtualSystemType::Tate:
+    case VirtualSystemType::Genre:
+    case VirtualSystemType::Lightgun: return true;
+    case VirtualSystemType::Ports:
+    {
+      for(const SystemDescriptor& descriptor : systemList)
+        if (descriptor.IsPort())
+          return true;
+      return false;
+    }
+    case VirtualSystemType::Arcade:
+    case VirtualSystemType::ArcadeManufacturers:
+    {
+      for(const SystemDescriptor& descriptor : systemList)
+        if (descriptor.IsTrueArcade())
+          return true;
+      return false;
+    }
+    case VirtualSystemType::None:
+    default: break;
+  }
+  return false;
+}
+
+void SystemManager::LoadVirtualSystems(const DescriptorList& systemList, bool portableSystem)
 {
   // Create automatic thread-pool
   ThreadPool<VirtualSystemDescriptor, VirtualSystemResult> threadPool(this, "Virtual-Load", false, 20);
 
-  static constexpr int sArcadeIndesBase = 200;
   int priority = -1;
-  int arcadeIndex = sArcadeIndesBase;
-  int genreIndex = 500;
+  int arcadeIndex = -100;
+  int genreIndex = -200;
 
   // Add ports first so that we can move it at the right place
-  threadPool.PushFeed(VirtualSystemDescriptor(VirtualSystemType::Ports, 50), ++priority);
+  if (VirtualSystemNeedRefresh(systemList, VirtualSystemType::Ports))
+    threadPool.PushFeed(VirtualSystemDescriptor(VirtualSystemType::Ports, -1), ++priority);
   // Start with arcade manufacturer systems, which load slower than the others
-  for(const String& driver : ArcadeVirtualSystems::GetVirtualArcadeSystemList())
-    threadPool.PushFeed(VirtualSystemDescriptor(driver, --arcadeIndex), ++priority);
+  if (VirtualSystemNeedRefresh(systemList, VirtualSystemType::ArcadeManufacturers))
+    for(const String& manufacturer : ArcadeVirtualSystems::GetVirtualArcadeSystemList())
+      threadPool.PushFeed(VirtualSystemDescriptor(manufacturer, ++arcadeIndex), ++priority);
   // Add genre systems
-  for(GameGenres genre : Genres::GetOrderedList())
-    threadPool.PushFeed(VirtualSystemDescriptor(genre, genreIndex), ++priority);
+  if (VirtualSystemNeedRefresh(systemList, VirtualSystemType::Genre))
+    for(GameGenres genre : Genres::GetOrderedList())
+      threadPool.PushFeed(VirtualSystemDescriptor(genre, ++genreIndex), ++priority);
+  // Add favorites
+  if (VirtualSystemNeedRefresh(systemList, VirtualSystemType::Favorites))
+    threadPool.PushFeed(VirtualSystemDescriptor(VirtualSystemType::Favorites, -2), ++priority);
+  // Add Last played
+  if (VirtualSystemNeedRefresh(systemList, VirtualSystemType::LastPlayed))
+    threadPool.PushFeed(VirtualSystemDescriptor(VirtualSystemType::LastPlayed, -3), ++priority);
+  // Add Multiplayers
+  if (VirtualSystemNeedRefresh(systemList, VirtualSystemType::Multiplayers))
+    threadPool.PushFeed(VirtualSystemDescriptor(VirtualSystemType::Multiplayers, -4), ++priority);
+  // Add all games
+  if (VirtualSystemNeedRefresh(systemList, VirtualSystemType::AllGames))
+    threadPool.PushFeed(VirtualSystemDescriptor(VirtualSystemType::AllGames, -5), ++priority);
   // Add lightgun
   if (!portableSystem)
-    threadPool.PushFeed(VirtualSystemDescriptor(VirtualSystemType::Lightgun, 10), ++priority);
-  // Add all games
-  threadPool.PushFeed(VirtualSystemDescriptor(VirtualSystemType::AllGames, 2), ++priority);
+    if (VirtualSystemNeedRefresh(systemList, VirtualSystemType::Lightgun))
+      threadPool.PushFeed(VirtualSystemDescriptor(VirtualSystemType::Lightgun, -6), ++priority);
   // Add Arcade
-  threadPool.PushFeed(VirtualSystemDescriptor(VirtualSystemType::Arcade, --arcadeIndex), ++priority);
-  // Add Multiplayers
-  threadPool.PushFeed(VirtualSystemDescriptor(VirtualSystemType::Multiplayers, 3), ++priority);
-  // Add favorites
-  threadPool.PushFeed(VirtualSystemDescriptor(VirtualSystemType::Favorites, 0), ++priority);
+  if (VirtualSystemNeedRefresh(systemList, VirtualSystemType::Arcade))
+    threadPool.PushFeed(VirtualSystemDescriptor(VirtualSystemType::Arcade, -7), ++priority);
   // Add Tate
-  threadPool.PushFeed(VirtualSystemDescriptor(VirtualSystemType::Tate, --arcadeIndex), ++priority);
-  // Add Last played
-  threadPool.PushFeed(VirtualSystemDescriptor(VirtualSystemType::LastPlayed, 1), ++priority);
+  if (VirtualSystemNeedRefresh(systemList, VirtualSystemType::Tate))
+    threadPool.PushFeed(VirtualSystemDescriptor(VirtualSystemType::Tate, -8), ++priority);
 
   if (mProgressInterface != nullptr)
     mProgressInterface->SetMaximum(priority);
@@ -971,10 +1046,9 @@ void SystemManager::LoadVirtualSystemConfigurations(bool portableSystem)
     sortedVirtualSystem.push_back(result);
   std::sort(sortedVirtualSystem.begin(), sortedVirtualSystem.end(), [] (const VirtualSystemResult& a, const VirtualSystemResult& b) { return a.mIndex < b.mIndex; });
 
-  index = 0; // Insert in the ascending order
   for(const VirtualSystemResult& result : sortedVirtualSystem)
   {
-    mAllSystems.Insert(result.mNewSystem, index);
+    mAllSystems.Add(result.mNewSystem);
     if (result.mNewSystem->HasVisibleGame()) mVisibleSystems.Add(result.mNewSystem);
   }
 }
@@ -994,13 +1068,13 @@ VirtualSystemResult SystemManager::ThreadPoolRunJob(VirtualSystemDescriptor& vir
     case VirtualSystemType::Arcade: { system = CreateArcadeSystem(); break; }
     case VirtualSystemType::Tate: { system = CreateTateSystem(); break; }
     case VirtualSystemType::Genre: { system = CreateGenreSystem(virtualDescriptor.Genre()); break; }
-    case VirtualSystemType::ArcadeManufacturers: { system = CreateArcadeManufacturersSystem(virtualDescriptor.ArcadeDriver()); break; }
+    case VirtualSystemType::ArcadeManufacturers: { system = CreateArcadeManufacturersSystem(virtualDescriptor.ArcadeManufacturer()); break; }
     case VirtualSystemType::None:
     default: break;
   }
 
   // Initialize
-  if (system != nullptr) InitializeSystem(system, false);
+  if (system != nullptr) InitializeSystem(system);
   else { LOG(LogError) << "[SystemManager] Unprocessed virtual descriptor!"; abort(); }
 
   return { system, virtualDescriptor.Index() };
@@ -1009,12 +1083,11 @@ VirtualSystemResult SystemManager::ThreadPoolRunJob(VirtualSystemDescriptor& vir
 SystemData& SystemManager::GetOrCreateSystem(const SystemDescriptor& descriptor)
 {
   // Seek for existing system
-  for(SystemData* system : mVisibleSystems)
+  for(SystemData* system : mAllSystems)
     if (system->Descriptor().GUID() == descriptor.GUID())
-    {
-      MakeSystemVisible(system);
       return *system;
-    }
+
+  { LOG(LogError) << "Unknown system UUID " << descriptor.GUID(); }
   abort();
 }
 
@@ -1027,7 +1100,7 @@ bool SystemManager::ThreadPoolRunJob(SystemData*& feed)
   return true;
 }
 
-void SystemManager::UpdateAllSystems()
+void SystemManager::UpdateAllGameLists()
 {
   DateTime start;
 
@@ -1049,14 +1122,35 @@ void SystemManager::UpdateAllSystems()
 
 void SystemManager::DeleteAllSystems(bool updateGamelists)
 {
+  mHasher.MustQuit();
+
   if (updateGamelists && !mAllSystems.Empty())
-    UpdateAllSystems();
+    UpdateAllGameLists();
 
   for(SystemData* system : mAllSystems)
     delete system;
 
   mVisibleSystems.Clear();
   mAllSystems.Clear();
+}
+
+SystemData* SystemManager::VirtualArcadeManufacturerSystemByName(const String& name)
+{
+  for(SystemData* system : mAllSystems)
+    if (system->VirtualType() == VirtualSystemType::ArcadeManufacturers)
+      if (system->Name() == name)
+        return system;
+  return nullptr;
+}
+
+SystemData* SystemManager::VirtualGenreSystemByGenre(GameGenres genre)
+{
+  String shortname(sGenrePrefix); shortname.Append(Genres::GetShortName(genre));
+  for(SystemData* system : mAllSystems)
+    if (system->VirtualType() == VirtualSystemType::Genre)
+      if (system->Name() == shortname)
+        return system;
+  return nullptr;
 }
 
 SystemData* SystemManager::VirtualSystemByType(VirtualSystemType type)
@@ -1098,16 +1192,6 @@ SystemData* SystemManager::FirstNonEmptySystem()
       return system;
 
   return nullptr;
-}
-
-void SystemManager::UpdateLastPlayedSystem(FileData& game)
-{
-  // Get last-played system
-  int index = getVisibleSystemIndex(sLastPlayedSystemShortName);
-  if (index < 0) return; // No last played system
-  SystemData& system = *mVisibleSystems[index];
-  // Update system
-  system.UpdateLastPlayedGame(game);
 }
 
 FileData::List SystemManager::SearchTextInGames(FolderData::FastSearchContext context, const String& originaltext, int maxglobal, const SystemData* targetSystem)
@@ -1396,7 +1480,8 @@ int SystemManager::GameCount() const
   int favorites = 0;
   int hidden = 0;
   for(const SystemData* system : mVisibleSystems)
-    result += system->GameCount(favorites, hidden);
+    if (!system->IsVirtual())
+      result += system->GameCount(favorites, hidden);
   return result;
 }
 
@@ -1407,7 +1492,7 @@ void SystemManager::UpdateSystemsOnGameChange(FileData* target, MetadataType cha
     List removedSystems;
     List modifiedSystems;
     if (UpdateSystemsOnGameDeletion(target, removedSystems, modifiedSystems))
-      ApplySystemChanges(nullptr, &removedSystems, &modifiedSystems);
+      ApplySystemChanges(nullptr, &removedSystems, &modifiedSystems, false);
     return;
   }
   if (changes != MetadataType::None)
@@ -1419,12 +1504,12 @@ void SystemManager::UpdateSystemsOnGameChange(FileData* target, MetadataType cha
     if (target != nullptr)
     {
       if (UpdateSystemsOnSingleGameChanges(target, changes, addedSystems, removedSystems, modifiedSystems))
-        ApplySystemChanges(&addedSystems, &removedSystems, &modifiedSystems);
+        ApplySystemChanges(&addedSystems, &removedSystems, &modifiedSystems, false);
       return;
     }
     // Multiple game move
     if (UpdateSystemsOnMultipleGameChanges(changes, addedSystems, removedSystems, modifiedSystems))
-      ApplySystemChanges(&addedSystems, &removedSystems, &modifiedSystems);
+      ApplySystemChanges(&addedSystems, &removedSystems, &modifiedSystems, false);
     return;
   }
   { LOG(LogError) << "[SystemManager] UpdateSystem called w/o any changes!"; }
@@ -1470,12 +1555,12 @@ bool SystemManager::UpdateSystemsOnMultipleGameChanges(MetadataType changes, Sys
       if (hasVisibleBefore)
       {
         if (hasVisibleNow) modifiedSystems.Add(system);
-        else { removedSystems.Add(system), MakeSystemInvisible(system); LogSystemRemoved(system); }
+        else { removedSystems.Add(system); LogSystemRemoved(system); }
         result = true;
       }
       else
       {
-        if (hasVisibleNow) { addedSystems.Add(system); MakeSystemVisible(system); LogSystemAdded(system); }
+        if (hasVisibleNow) { addedSystems.Add(system); LogSystemAdded(system); }
         // Else nothing, the system is still invisible
       }
     }
@@ -1506,7 +1591,7 @@ bool SystemManager::UpdateSystemsOnSingleGameChanges(FileData* target, MetadataT
         LogSystemGameRemoved(system, target);
         // In what list must we add the system?
         if (system->HasGame()) modifiedSystems.Add(system);
-        else { removedSystems.Add(system); MakeSystemInvisible(system); LogSystemRemoved(system); }
+        else { removedSystems.Add(system); LogSystemRemoved(system); }
         result = true;
       }
       else if (!isAlreadyIn && shouldBeIn) // Must add
@@ -1521,7 +1606,7 @@ bool SystemManager::UpdateSystemsOnSingleGameChanges(FileData* target, MetadataT
         LogSystemGameAdded(system, target);
         // In what list must we add the system?
         if (hasGame) modifiedSystems.Add(system);
-        else { addedSystems.Add(system); MakeSystemVisible(system); LogSystemAdded(system); }
+        else { addedSystems.Add(system); LogSystemAdded(system); }
         result = true;
       }
     }
@@ -1549,34 +1634,143 @@ bool SystemManager::ShouldGameBelongToThisVirtualSystem(const FileData* game, co
   // Tate ?
   if (system->Name() == sTateSystemShortName) return game->Metadata().Rotation() == RotationType::Left || game->Metadata().Rotation() == RotationType::Right;
   // All game?
-  if (system->Name() == sTateSystemShortName) return true;
+  if (system->Name() == sAllGamesSystemShortName) return true;
 
   // We don't know...
   return false;
 }
 
-void
-SystemManager::ApplySystemChanges(SystemManager::List* addedSystems,
-                                  SystemManager::List* removedSystems, SystemManager::List* modifiedSystems)
+void SystemManager::SlowPopulateExecute(const SystemManager::List& listToPopulate)
 {
-  // Added virtual systems?
-  if (addedSystems != nullptr)
-    for(SystemData* system : *addedSystems)
+  // Initialize & populate (if required)
+  for (SystemData* system : listToPopulate)
+    InitializeSystem(system);
+}
+
+void SystemManager::SlowPopulateCompleted(const SystemManager::List& listPopulated, bool autoSelectMonoSystem)
+{
+  bool hasVisibleGame = false;
+  // Show all systems
+  for (SystemData* system : listPopulated)
+    if (hasVisibleGame = system->HasVisibleGame(); hasVisibleGame)
     {
-      // Initialize if required
-      InitializeSystem(system, true);
+      MakeSystemVisible(system);
       if (mSystemChangeNotifier != nullptr)
         mSystemChangeNotifier->ShowSystem(system);
     }
+  // If there is only one, select it!
+  if (autoSelectMonoSystem)
+    if (listPopulated.Count() == 1)
+      if (mSystemChangeNotifier != nullptr)
+      {
+        if (hasVisibleGame) mSystemChangeNotifier->SelectSystem(listPopulated.First());
+        else mSystemChangeNotifier->SystemShownWithNoGames(listPopulated.First());
+      }
+}
+
+bool SystemManager::ContainsUnitializedSystem(const SystemManager::List& list)
+{
+  // Chekc if at least one system is not initialized
+  for (SystemData* system : list)
+    if (!system->IsInitialized())
+      return true;
+  return false;
+}
+
+void
+SystemManager::ApplySystemChanges(SystemManager::List* addedSystems,
+                                  SystemManager::List* removedSystems, SystemManager::List* modifiedSystems,
+                                  bool autoSelectMonoSystem)
+{
+  // Remove always-hidden system
+  if (addedSystems != nullptr)
+    RemoveAlwaysHiddenSystems(*addedSystems);
+  // Added virtual systems?
+  if (addedSystems != nullptr && !addedSystems->Empty())
+  {
+    if (ContainsUnitializedSystem(*addedSystems))
+    {
+      if (mSystemChangeNotifier != nullptr)
+        mSystemChangeNotifier->RequestSlowOperation(this, *addedSystems, autoSelectMonoSystem);
+    }
+    else SlowPopulateCompleted(*addedSystems, autoSelectMonoSystem);
+  }
   // Removed virtual systems?
-  if (removedSystems != nullptr)
+  if (removedSystems != nullptr && !removedSystems->Empty())
     for(SystemData* system : *removedSystems)
+    {
+      MakeSystemInvisible(system);
       if (mSystemChangeNotifier != nullptr)
         mSystemChangeNotifier->HideSystem(system);
+    }
   // Modified virtual systems?
   if (modifiedSystems != nullptr)
     for (SystemData* system: *modifiedSystems)
       if (mSystemChangeNotifier != nullptr)
         mSystemChangeNotifier->UpdateSystem(system);
+}
+
+bool SystemManager::UpdatedTopLevelFilter()
+{
+  SystemManager::List added;
+  SystemManager::List removed;
+  SystemManager::List updated;
+
+  // Check all systems
+  for(SystemData* system : mAllSystems)
+    if (system->HasVisibleGame())
+    {
+      if (!mVisibleSystems.Contains(system)) // System was invisible?
+        added.Add(system);
+    }
+    else
+    {
+      if (mVisibleSystems.Contains(system)) // System was visible?
+        removed.Add(system);
+    }
+  // Finally, any visible system not in remove list must be updated
+  for(SystemData* system : mVisibleSystems)
+    if (!removed.Contains(system))
+      updated.Add(system);
+
+  // Check if the filter does not remove all visible systems
+  int visibleSystems = mVisibleSystems.Count();
+  for(SystemData* system : removed)
+    if (mVisibleSystems.Contains(system))
+      --visibleSystems;
+
+  if (visibleSystems != 0)
+    ApplySystemChanges(&added, &removed, &updated, false);
+
+  return visibleSystems != 0;
+}
+
+void SystemManager::UpdateSystemsVisibility(SystemData* system, Visibility visibility)
+{
+  List list({ system });
+  bool visible = mVisibleSystems.Contains(system);
+  if ((visibility == Visibility::Show || visibility == Visibility::ShowAndSelect) && !visible) ApplySystemChanges(&list, nullptr, nullptr, visibility == Visibility::ShowAndSelect);
+  else if (visibility == Visibility::Hide && visible) ApplySystemChanges(nullptr, &list, nullptr, false);
+}
+
+void SystemManager::RemoveAlwaysHiddenSystems(List& list)
+{
+  bool arcadeCollectionOn = RecalboxConf::Instance().GetCollectionArcade();
+  bool hideOriginals = RecalboxConf::Instance().GetCollectionArcadeHideOriginals();
+  bool includeNeogeo = RecalboxConf::Instance().GetCollectionArcadeNeogeo();
+  for(int i = list.Count(); --i >= 0;)
+  {
+    const SystemData* system = list[i];
+    if (
+        // Always hide ports
+        system->IsPorts() ||
+        // Hide arcade systems ?
+        (arcadeCollectionOn && hideOriginals &&
+         (system->IsTrueArcade() || (includeNeogeo && system->Name() == "neogeo"))) ||
+        // Hide last played
+        (system->IsLastPlayed() && !RecalboxConf::Instance().GetCollectionLastPlayed())
+      )
+      list.Delete(i);
+  }
 }
 

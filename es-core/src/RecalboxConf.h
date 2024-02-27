@@ -12,6 +12,7 @@
 #include <scraping/scrapers/screenscraper/Languages.h>
 #include <audio/AudioMode.h>
 #include "systems/SystemSorting.h"
+#include "IRecalboxConfChanged.h"
 #include <scraping/ScraperType.h>
 
 // Forward declaration
@@ -32,7 +33,13 @@ class RecalboxConf: public IniFile, public StaticLifeCycleControler<RecalboxConf
     /*!
      * @brief Called when file has been saved
      */
-    void OnSave() override;
+    void OnSave() const override;
+
+    /*
+     * Watching
+     */
+
+    void Watch(const String& key, IRecalboxConfChanged& callback);
 
     /*
      * Enums
@@ -67,7 +74,18 @@ class RecalboxConf: public IniFile, public StaticLifeCycleControler<RecalboxConf
     {
       Disable, //!< No soft patching
       Auto,    //!< Automatic patch selection
+      LaunchLast,    //!< Automatic patch selection
       Select,  //!< Manual patch selection
+    };
+
+    enum class PadOSDType
+    {
+      Snes, //!< SNES type pad
+      MD  , //!< Megadrive type pad
+      XBox, //!< XBox type pad
+      PSX , //!< Playstation type pad
+      N64 , //!< Nintendo 64 type pad
+      DC  , //!< Dreamcast pad type
     };
 
     /*
@@ -139,7 +157,7 @@ class RecalboxConf: public IniFile, public StaticLifeCycleControler<RecalboxConf
       bool RecalboxConf::IsIn##name(const SystemData& system, const String& value) const { return isInList(String("emulationstation.").Append(system.Name()).Append('.').Append(key), value); } \
       RecalboxConf& RecalboxConf::Set##name(const SystemData& system, const String::List& value) { SetString(String("emulationstation.").Append(system.Name()).Append('.').Append(key), String::Join(value, ',')); return *this; }
 
-    DefineEmulationStationSystemListGetterSetterDeclaration(ArcadeSystemHiddenDrivers, sArcadeSystemHiddenDrivers)
+    DefineEmulationStationSystemListGetterSetterDeclaration(ArcadeSystemHiddenManufacturers, sArcadeSystemHiddenManufacturers)
 
     DefineGetterSetterEnum(MenuType, Menu, sMenuType, Menu)
     DefineGetterSetterEnum(ScraperNameOptions, ScraperNameOptions, sScraperGetNameFrom, ScraperTools::ScraperNameOptions)
@@ -157,15 +175,15 @@ class RecalboxConf: public IniFile, public StaticLifeCycleControler<RecalboxConf
     DefineGetterSetter(Hostname, String, String, sHostname, "RECALBOX")
 
     DefineGetterSetter(WifiEnabled, bool, Bool, sWifiEnabled, false)
-    DefineGetterSetter(WifiSSID, String, String, sWifiSSID, "Dhani Home_plus")
-    DefineGetterSetter(WifiKey, String, String, sWifiKey, "Genteng2202")
+    DefineGetterSetter(WifiSSID, String, String, sWifiSSID, "")
+    DefineGetterSetter(WifiKey, String, String, sWifiKey, "")
 
-    DefineGetterSetter(SwapValidateAndCancel, bool, Bool, sSwapValidateAndCancel, false)
+    DefineGetterSetter(SwapValidateAndCancel, bool, Bool, sSwapValidateAndCancel, true)
 
     DefineGetterSetter(AudioVolume, int, Int, sAudioVolume, 90)
     DefineGetterSetter(AudioOuput, String, String, sAudioOuput, "")
 
-    DefineGetterSetter(MusicRemoteEnable, bool, Bool, sMusicDisableRemote, true)
+    DefineGetterSetter(MusicRemoteEnable, bool, Bool, sMusicDisableRemote, false)
 
     DefineGetterSetter(ScreenSaverTime, int, Int, sScreenSaverTime, 5)
     DefineGetterSetterEnum(ScreenSaverType, Screensaver, sScreenSaverType, Screensaver)
@@ -188,7 +206,7 @@ class RecalboxConf: public IniFile, public StaticLifeCycleControler<RecalboxConf
     DefineGetterSetterParameterized(ThemeRegion      , String, String, sThemeGeneric, ".region", "")
 
     DefineGetterSetter(Brightness, int, Int, sBrightness, 7)
-    DefineGetterSetter(Clock, bool, Bool, sClock, true)
+    DefineGetterSetter(Clock, bool, Bool, sClock, false)
     DefineGetterSetter(ShowHelp, bool, Bool, sShowHelp, true)
     DefineGetterSetter(ShowGameClipHelpItems, bool, Bool, sShowGameClipHelpItems, true)
     DefineGetterSetter(ShowGameClipClippingItem, bool, Bool, sShowGameClipClippingItem, true)
@@ -209,13 +227,12 @@ class RecalboxConf: public IniFile, public StaticLifeCycleControler<RecalboxConf
     DefineGetterSetter(Overclocking, String, String, sOverclocking, "none")
     DefineGetterSetter(Overscan, bool, Bool, sOverscan, false)
 
-    DefineGetterSetter(KodiEnabled, bool, Bool, sKodiEnabled, true)
+    DefineGetterSetter(KodiEnabled, bool, Bool, sKodiEnabled, false)
     DefineGetterSetter(KodiAtStartup, bool, Bool, sKodiAtStartup, false)
     DefineGetterSetter(KodiXButton, bool, Bool, sKodiXButton, false)
 
     DefineGetterSetterEnum(ScraperSource, ScraperType, sScraperSource, ScraperType)
     DefineGetterSetter(ScraperAuto, bool, Bool, sScraperAuto, true)
-    DefineGetterSetter(ScraperLocal, bool, Bool, sScraperLocal, false)
 
     DefineGetterSetter(RecalboxPrivateKey, String, String, sRecalboxPrivateKey, "")
 
@@ -260,8 +277,12 @@ class RecalboxConf: public IniFile, public StaticLifeCycleControler<RecalboxConf
     DefineGetterSetter(GlobalInputDriver, String, String, sGlobalInputDriver, "auto")
     DefineGetterSetter(GlobalDemoDuration, int, Int, sGlobalDemoDuration, 90)
     DefineGetterSetter(GlobalDemoInfoScreen, int, Int, sGlobalDemoInfoScreen, 6)
-    DefineGetterSetter(GlobalZeroLag, bool, Bool, sGlobalZeroLag, false)
+    DefineGetterSetter(GlobalReduceLatency, bool, Bool, sGlobalReduceLatency, false)
+    DefineGetterSetter(GlobalRunAhead, bool, Bool, sGlobalRunAhead, false)
     DefineGetterSetter(GlobalShowSaveStateBeforeRun, bool, Bool, sGlobalShowSaveStateBeforeRun, false)
+    DefineGetterSetter(GlobalHDMode, bool, Bool, sGlobalHDMode, false)
+    DefineGetterSetter(GlobalWidescreenMode, bool, Bool, sGlobalWidescreen, false)
+    DefineGetterSetter(GlobalVulkanDriver, bool, Bool, sGlobalVulkanDriver, true)
 
     DefineGetterSetter(CollectionLastPlayed, bool, Bool, sCollectionLastPlayed, false)
     DefineGetterSetter(CollectionMultiplayer, bool, Bool, sCollectionMultiplayer, false)
@@ -269,6 +290,7 @@ class RecalboxConf: public IniFile, public StaticLifeCycleControler<RecalboxConf
     DefineGetterSetter(CollectionLightGun, bool, Bool, sCollectionLightGun, false)
     DefineGetterSetter(CollectionPorts, bool, Bool, sCollectionPorts, true)
     DefineGetterSetter(CollectionTate, bool, Bool, sCollectionTate, false)
+    DefineListGetterSetter(CollectionGenre, sCollectionGenre, "")
     DefineGetterSetter(TateGameRotation, int, Int, sTateGameRotation, 0)
     DefineGetterSetter(TateOnly, bool, Bool, sTateOnly, false)
 
@@ -291,11 +313,20 @@ class RecalboxConf: public IniFile, public StaticLifeCycleControler<RecalboxConf
     DefineGetterSetter(GlobalVideoMode, String, String, sGlobalVideoMode, "")
     DefineGetterSetter(KodiVideoMode, String, String, sKodiVideoMode, "")
     DefineGetterSetter(ESForce43, bool, Bool, sESForce43, false)
+    DefineGetterSetter(SplashEnabled, bool, Bool, sSplashEnabled, true)
+
 
     DefineGetterSetter(BatteryHidden, bool, Bool, sBatteryHidden, false)
+    DefineGetterSetter(PadOSD, bool, Bool, sPadOSD, false)
+    DefineGetterSetterEnum(PadOSDType, PadOSDType, sPadOSDType, PadOSDType)
+    DefineGetterSetter(AutoPairOnBoot, bool, Bool, sAutoPairOnBoot, true)
 
     DefineGetterSetter(SuperGameBoy, String, String, sSuperGameBoyOption, "gb")
     DefineGetterSetter(Experimental, bool, Bool, sExperimental, GetUpdatesType() != "stable")
+
+    DefineGetterSetter(AutorunEnabled, bool, Bool, sAutorunEnabled, false)
+    DefineGetterSetter(AutorunSystemUUID, String, String, sAutorunSystemUUID, "")
+    DefineGetterSetter(AutorunGamePath, String, String, sAutorunGamePath, "")
 
     /*
      * System
@@ -323,38 +354,6 @@ class RecalboxConf: public IniFile, public StaticLifeCycleControler<RecalboxConf
     #undef DefineListGetterSetter
     #undef DefineGetterSetterParameterized
 
-    /*
-     * Direct Implementations - Collections
-     */
-
-    [[nodiscard]] bool GetCollection(const String& name) const { return AsBool(String(sCollectionHeader).Append('.').Append(name), false); }
-    RecalboxConf& SetCollection(const String& name, bool on) { SetBool(String(sCollectionHeader).Append('.').Append(name), on); return *this; }
-
-    [[nodiscard]] String GetCollectionTheme(const String& name) const { return AsString(String(sCollectionHeader).Append('.').Append(name).Append('.').Append(sCollectionTheme), String("auto-").Append(name)); }
-    RecalboxConf& SetCollectionTheme(const String& name, const String& value) { SetString(String(sCollectionHeader).Append('.').Append(name).Append('.').Append(sCollectionTheme), value); return *this; }
-
-    [[nodiscard]] int GetCollectionLimit(const String& name) const { return AsInt(String(sCollectionHeader).Append('.').Append(name).Append('.').Append(sCollectionLimit), 0); }
-    RecalboxConf& SetCollectionLimit(const String& name, int limit) { SetInt(String(sCollectionHeader).Append('.').Append(name).Append('.').Append(sCollectionLimit), limit); return *this; }
-
-    [[nodiscard]] bool GetCollectionHide(const String& name) const { return AsBool(String(sCollectionHeader).Append('.').Append(name).Append('.').Append(sCollectionHide), false); }
-    RecalboxConf& SetCollectionHide(const String& name, bool hide) { SetBool(String(sCollectionHeader).Append('.').Append(name).Append('.').Append(sCollectionHide), hide); return *this; }
-
-    /*
-     * Direct Implementations - Arcade collections
-     */
-    /*
-    [[nodiscard]] bool GetArcadeCollection(const String& name) const { return AsBool(String(sArcadeCollectionHeader).Append('.').Append(name), false); }
-    RecalboxConf& SetArcadeCollection(const String& name, bool on) { SetBool(String(sArcadeCollectionHeader).Append('.').Append(name), on); return *this; }
-
-    [[nodiscard]] String GetArcadeCollectionTheme(const String& name) const { return AsString(String(sArcadeCollectionHeader).Append('.').Append(name).Append('.').Append(sCollectionTheme), String("auto-arcade-").Append(name)); }
-    RecalboxConf& SetArcadeCollectionTheme(const String& name, const String& value) { SetString(String(sArcadeCollectionHeader).Append('.').Append(name).Append('.').Append(sCollectionTheme), value); return *this; }
-
-    [[nodiscard]] int GetArcadeCollectionPosition(const String& name) const { return AsInt(String(sArcadeCollectionHeader).Append('.').Append(name).Append('.').Append(sCollectionPosition), 0); }
-    RecalboxConf& SetArcadeCollectionPosition(const String& name, int position) { SetInt(String(sArcadeCollectionHeader).Append('.').Append(name).Append('.').Append(sCollectionPosition), position); return *this; }
-
-    [[nodiscard]] bool GetArcadeCollectionShow(const String& name) const { return AsBool(String(sArcadeCollectionHeader).Append('.').Append(name).Append('.').Append(sCollectionShow), false); }
-    RecalboxConf& SetArcadeCollectionShow(const String& name, bool Show) { SetBool(String(sArcadeCollectionHeader).Append('.').Append(name).Append('.').Append(sCollectionShow), Show); return *this; }
-    */
     /*
      * Direct Implementations - Pads
      */
@@ -419,8 +418,13 @@ class RecalboxConf: public IniFile, public StaticLifeCycleControler<RecalboxConf
     static constexpr const char* sGlobalShowFPS              = "global.showfps";
     static constexpr const char* sGlobalDemoDuration         = "global.demo.duration";
     static constexpr const char* sGlobalDemoInfoScreen       = "global.demo.infoscreenduration";
-    static constexpr const char* sGlobalZeroLag              = "global.zerolag";
+    static constexpr const char* sGlobalReduceLatency        = "global.reducelatency";
+    static constexpr const char* sGlobalRunAhead             = "global.runahead";
+    static constexpr const char* sGlobalHDMode               = "global.hdmode";
+    static constexpr const char* sGlobalWidescreen           = "global.widescreenmode";
     static constexpr const char* sGlobalShowSaveStateBeforeRun = "global.show.savestate.before.run";
+    static constexpr const char* sSplashEnabled              = "system.splash.enabled";
+    static constexpr const char* sGlobalVulkanDriver         = "global.vulkandriver";
 
     static constexpr const char* sGlobalInputDriver          = "global.inputdriver";
 
@@ -466,12 +470,14 @@ class RecalboxConf: public IniFile, public StaticLifeCycleControler<RecalboxConf
     static constexpr const char* sSystemSorting              = "emulationstation.systemsorting";
 
     static constexpr const char* sBatteryHidden              = "emulationstation.battery.hidden";
+    static constexpr const char* sPadOSD                     = "emulationstation.pads.osd";
+    static constexpr const char* sPadOSDType                 = "emulationstation.pads.osd.type";
+    static constexpr const char* sAutoPairOnBoot             = "controllers.bluetooth.autopaironboot";
 
     static constexpr const char* sEsVideoMode                = "system.es.videomode";
     static constexpr const char* sGlobalVideoMode            = "global.videomode";
     static constexpr const char* sKodiVideoMode              = "kodi.videomode";
     static constexpr const char* sESForce43                  = "system.es.force43";
-
 
     static constexpr const char* sFirstTimeUse               = "system.firsttimeuse";
     static constexpr const char* sSystemLanguage             = "system.language";
@@ -489,7 +495,6 @@ class RecalboxConf: public IniFile, public StaticLifeCycleControler<RecalboxConf
 
     static constexpr const char* sScraperSource              = "scraper.source";
     static constexpr const char* sScraperAuto                = "scraper.auto";
-    static constexpr const char* sScraperLocal               = "scraper.local";
     static constexpr const char* sScraperGetNameFrom         = "scraper.getnamefrom";
 
     static constexpr const char* sRecalboxPrivateKey         = "patron.privatekey";
@@ -535,6 +540,7 @@ class RecalboxConf: public IniFile, public StaticLifeCycleControler<RecalboxConf
     static constexpr const char* sCollectionLightGun         = "emulationstation.collection.lightgun";
     static constexpr const char* sCollectionPorts            = "emulationstation.collection.ports";
     static constexpr const char* sCollectionTate             = "emulationstation.collection.tate";
+    static constexpr const char* sCollectionGenre            = "emulationstation.collection.genre";
     static constexpr const char* sTateGameRotation           = "tate.gamerotation";
     static constexpr const char* sTateOnly                   = "emulationstation.tateonly";
 
@@ -550,6 +556,10 @@ class RecalboxConf: public IniFile, public StaticLifeCycleControler<RecalboxConf
     static constexpr const char* sArcadeViewHideNonWorking   = "emulationstation.arcade.view.hidenonworking";
     static constexpr const char* sArcadeUseDatabaseNames     = "emulationstation.arcade.usedatabasenames";
 
+    static constexpr const char* sAutorunEnabled             = "autorun.enabled";
+    static constexpr const char* sAutorunSystemUUID          = "autorun.uuid";
+    static constexpr const char* sAutorunGamePath            = "autorun.path";
+
     static constexpr const char* sUpdatesEnabled             = "updates.enabled";
     static constexpr const char* sUpdatesType                = "updates.type";
 
@@ -561,9 +571,11 @@ class RecalboxConf: public IniFile, public StaticLifeCycleControler<RecalboxConf
 
     static constexpr const char* sSuperGameBoyOption         = "gb.supergameboy";
 
-    static constexpr const char* sArcadeSystemHiddenDrivers  = "hiddendrivers";
+    static constexpr const char* sArcadeSystemHiddenManufacturers  = "hiddendrivers";
 
   private:
+    HashMap<String, Array<IRecalboxConfChanged*>> mWatchers;
+
     /*
      * Culture
      */
@@ -587,4 +599,6 @@ class RecalboxConf: public IniFile, public StaticLifeCycleControler<RecalboxConf
     static const String& SystemSortingFromEnum(SystemSorting systemSorting);
     static ScraperType ScraperTypeFromString(const String& menu);
     static const String& ScraperTypeFromEnum(ScraperType type);
+    static PadOSDType PadOSDTypeFromString(const String& pad);
+    static const String& PadOSDTypeFromEnum(PadOSDType type);
 };

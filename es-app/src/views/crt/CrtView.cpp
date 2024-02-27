@@ -143,6 +143,10 @@ bool CrtView::ProcessInput(const InputCompactEvent& event)
   {
     CrtConf::Instance().Save();
     reso = mSequence[++mSequenceIndex];
+    // Skip interlaced if needed
+    if(!Board::Instance().CrtBoard().HasInterlacedSupport())
+      while(mSequence[mSequenceIndex] == CrtResolution::r480i || mSequence[mSequenceIndex] == CrtResolution::r576i)
+        mSequenceIndex++;
     if (mSequence[mSequenceIndex] == CrtResolution::rNone)
       mEvent.Send();
     else {

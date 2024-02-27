@@ -15,10 +15,13 @@ class SystemHasher : private Thread
     SystemHasher();
 
     //! Destructor
-    ~SystemHasher();
+    ~SystemHasher() override;
 
     //! Push a new system to auto-hash
     void Push(SystemData* system);
+
+    //! Application is about to quit - stop any processing asap
+    void MustQuit();
 
   private:
     //! Working signal
@@ -26,7 +29,7 @@ class SystemHasher : private Thread
     //! Queue protector
     Mutex mLocker;
     //! System queue
-    Queue<SystemData*> mQueue;
+    ::Queue<SystemData*> mQueue;
 
     /*!
      * @brief Check missing hashed and calculate them all

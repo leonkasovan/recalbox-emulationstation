@@ -12,7 +12,7 @@ class CrtPi2Scart : public ICrtInterface
 {
   public:
     //! Constructor
-    explicit CrtPi2Scart(bool automaticallyDetected) : ICrtInterface(automaticallyDetected) {}
+    explicit CrtPi2Scart(bool automaticallyDetected, BoardType boardType) : ICrtInterface(automaticallyDetected, boardType) {}
 
     //! Yes a CRT adapter is attached!
     bool IsCrtAdapterAttached() const override { return true; }
@@ -31,4 +31,10 @@ class CrtPi2Scart : public ICrtInterface
 
     //! This adapter cannot force 50hz
     bool MustForce50Hz() const override { return false; }
+
+    //! The comment is here to tell you that the name will be returned bby this methode named Name()
+    std::string& Name() const override { static std::string adapterString("Pi2Scart"); return adapterString; }
+
+    std::string& ShortName() const override { static std::string adapterShortString("pi2scart"); return adapterShortString; }
+
 };

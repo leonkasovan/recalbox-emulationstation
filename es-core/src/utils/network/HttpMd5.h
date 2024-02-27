@@ -6,10 +6,10 @@
 //
 #pragma once
 
-#include <utils/network/Http.h>
+#include <utils/network/HttpClient.h>
 #include <utils/hash/Md5.h>
 
-class HttpMd5 : public Http
+class HttpMd5 : public HttpClient
 {
   public:
     //! Default constructor

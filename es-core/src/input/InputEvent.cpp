@@ -11,10 +11,12 @@ String InputEvent::TypeToString(EventType type)
 {
   switch(type)
   {
-    case EventType::Axis:		return "axis";
-    case EventType::Button:	return "button";
-    case EventType::Hat:		return "hat";
-    case EventType::Key:		return "key";
+    case EventType::Axis:        return "axis";
+    case EventType::Button:      return "button";
+    case EventType::Hat:         return "hat";
+    case EventType::Key:         return "key";
+    case EventType::MouseButton: return "mbutton";
+    case EventType::MouseWheel:  return "mwheel";
     case EventType::Unknown:
     default:
     {
@@ -26,10 +28,12 @@ String InputEvent::TypeToString(EventType type)
 
 InputEvent::EventType InputEvent::StringToType(const String& type)
 {
-  if (type == "axis")	  return EventType::Axis;
-  if (type == "button")	return EventType::Button;
-  if (type == "hat")    return EventType::Hat;
-  if (type == "key")    return EventType::Key;
+  if (type == "axis")	   return EventType::Axis;
+  if (type == "button")	 return EventType::Button;
+  if (type == "hat")     return EventType::Hat;
+  if (type == "key")     return EventType::Key;
+  if (type == "mbutton") return EventType::MouseButton;
+  if (type == "mwheel")  return EventType::MouseWheel;
   { LOG(LogError) << "[InputEvent] Unknown string Input type: " << type; }
   return EventType::Unknown;
 }
@@ -59,10 +63,12 @@ String InputEvent::ToString() const
 {
   switch (mType)
   {
-    case EventType::Button:  return String("Button ").Append(mId).Append(' ').Append(mValue != 0 ? "pressed" : "released");
-    case EventType::Axis:    return String("Axis ").Append(mId).Append((mValue > 0 ? '+' : '-'));
-    case EventType::Hat:     return String("Hat ").Append(mId).Append(' ').Append(HatDir(mValue));
-    case EventType::Key:     return String("Key ").Append(SDL_GetKeyName((SDL_Keycode)mId));
+    case EventType::Button:      return String("Button ").Append(mId).Append(' ').Append(mValue != 0 ? "pressed" : "released");
+    case EventType::Axis:        return String("Axis ").Append(mId).Append((mValue > 0 ? '+' : '-'));
+    case EventType::Hat:         return String("Hat ").Append(mId).Append(' ').Append(HatDir(mValue));
+    case EventType::Key:         return String("Key ").Append(SDL_GetKeyName((SDL_Keycode)mId));
+    case EventType::MouseButton: return String("mbutton ").Append(mId).Append(' ').Append(mValue != 0 ? "pressed" : "released");
+    case EventType::MouseWheel:  return String("mwheel ").Append(mId).Append((mValue > 0 ? '+' : '-'));
     case EventType::Unknown:
     default: break;
   }

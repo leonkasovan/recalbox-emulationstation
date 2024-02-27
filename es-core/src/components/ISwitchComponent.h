@@ -14,5 +14,5 @@ class ISwitchComponent
      * @param id Component id
      * @param status New status
      */
-    virtual void SwitchComponentChanged(int id, bool status) = 0;
+    virtual void SwitchComponentChanged(int id, bool& status) = 0;
 };

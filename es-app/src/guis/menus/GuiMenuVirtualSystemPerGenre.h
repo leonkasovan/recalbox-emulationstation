@@ -10,26 +10,26 @@
 
 // Forward declaration
 class SystemManager;
-template<class T> class OptionListComponent;
-class SwitchComponent;
 
 class GuiMenuVirtualSystemPerGenre : public GuiMenuBase
+                                   , public ISwitchComponent
 {
   public:
     /*!
      * @brief Default constructor
      * @param window Global window
      */
-    explicit GuiMenuVirtualSystemPerGenre(WindowManager& window);
-
-    //! Destructor
-    ~GuiMenuVirtualSystemPerGenre() override;
+    explicit GuiMenuVirtualSystemPerGenre(WindowManager& window, SystemManager& systemManager);
 
   private:
-    //! Switch component per genre
-    std::map<std::shared_ptr<SwitchComponent>, String> mComponents;
-    //! Original values
-    std::map<String, bool> mOriginalValues;
+    //! System manager reference
+    SystemManager& mSystemManager;
+
+    //! List of activated genre virtual system
+    HashMap<String, bool> mGenres;
+
+    //! Switch component changed
+    void SwitchComponentChanged(int id, bool& status) override;
 };
 
 

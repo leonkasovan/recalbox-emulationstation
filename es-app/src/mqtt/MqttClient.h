@@ -17,8 +17,13 @@ class MqttClient
   public:
     /*!
      * @brief Default constructor
+     * @param clientid Client ID
+     * @param receiver Receiver interface
      */
     MqttClient(const char* clientid, IMQTTMessageReceived* callback);
+
+    //! Destructor
+    ~MqttClient() override;
 
     /*!
      * @brief Send a string to the specified topic
@@ -26,12 +31,13 @@ class MqttClient
      * @param data UTF8 string to send
      * @return True if the string has been sent w/o error
      */
-    bool Send(const String& topic, const String& data);
+    bool Send(const String& topic, const String& data, int qos = 0);
 
     /*!
      * @brief Wait for current operation to finish
      */
     void Wait();
+    void WaitFor(int t);
 
     /*!
      * @brief Disconnect
@@ -72,10 +78,10 @@ class MqttClient
      * mqtt::iaction_listener implementation
      */
 
-    // Connection failure
+    //! Connection failure
     void on_failure(const mqtt::token& asyncActionToken) override;
 
-    // Connection success
+    //! Connection success
     void on_success(const mqtt::token& asyncActionToken) override;
 
     /*!

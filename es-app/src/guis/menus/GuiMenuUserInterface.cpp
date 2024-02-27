@@ -9,7 +9,6 @@
 #include "GuiMenuThemeConfiguration.h"
 #include "GuiMenuGameFilters.h"
 #include "GuiMenuBase.h"
-#include "GuiMenuArcadeOptions.h"
 #include <guis/MenuMessages.h>
 #include <guis/GuiMsgBox.h>
 #include <MainRunner.h>
@@ -56,9 +55,6 @@ GuiMenuUserInterface::GuiMenuUserInterface(WindowManager& window, SystemManager&
   // Display filename
   AddSwitch(_("DISPLAY BY FILENAME"), RecalboxConf::Instance().GetDisplayByFileName(), (int)Components::DisplayByFileName, this, _(MENUMESSAGE_UI_FILE_NAME_MSG));
 
-  // Arcade options
-  AddSubMenu(_("ARCADE VIEW OPTIONS"), (int)Components::Arcade, _(MENUMESSAGE_UI_ARCADE_MSG));
-
   // Game List Update
   AddSubMenu(_("UPDATE GAMES LISTS"), (int)Components::UpdateGamelist, _(MENUMESSAGE_UI_UPDATE_GAMELIST_HELP_MSG));
 }
@@ -92,8 +88,7 @@ void GuiMenuUserInterface::SubMenuSelected(int id)
     case Components::Theme: mWindow.pushGui(new GuiMenuThemeOptions(mWindow)); break;
     case Components::ThemeConfig: mWindow.pushGui(new GuiMenuThemeConfiguration(mWindow, RecalboxConf::Instance().GetThemeFolder())); break;
     case Components::UpdateGamelist: ReloadGamelists(); break;
-    case Components::Filters: mWindow.pushGui(new GuiMenuGameFilters(mWindow)); break;
-    case Components::Arcade: mWindow.pushGui(new GuiMenuArcadeOptions(mWindow)); break;
+    case Components::Filters: mWindow.pushGui(new GuiMenuGameFilters(mWindow, mSystemManager)); break;
     case Components::Brightness:
     case Components::Clock:
     case Components::SwapValidateAndCancel:
@@ -114,7 +109,7 @@ void GuiMenuUserInterface::SliderMoved(int id, float value)
     }
 }
 
-void GuiMenuUserInterface::SwitchComponentChanged(int id, bool status)
+void GuiMenuUserInterface::SwitchComponentChanged(int id, bool& status)
 {
   SystemData* systemData = ViewController::Instance().CurrentSystem();
 
@@ -141,8 +136,7 @@ void GuiMenuUserInterface::SwitchComponentChanged(int id, bool status)
     case Components::ScreenSaver:
     case Components::SystemSort:
     case Components::Filters:
-    case Components::Brightness:
-    case Components::Arcade: break;
+    case Components::Brightness: break;
   }
 }
 

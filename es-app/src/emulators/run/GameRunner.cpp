@@ -20,14 +20,13 @@
 #include "Resolutions.h"
 #include "ResolutionAdapter.h"
 #include "RotationManager.h"
-#include <string>
-#include "views/gamelist/DetailedGameListView.h"
+#include <chrono>
 
 bool GameRunner::sGameIsRunning = false;
 
 IBoardInterface::CPUGovernance GameRunner::GetGovernance(const String& core)
 {
-  static IniFile governanceFile(Path(sGovernanceFile), false);
+  static IniFile governanceFile(Path(sGovernanceFile), false, false);
 
   String governance = governanceFile.AsString(core);
 
@@ -107,7 +106,7 @@ String GameRunner::CreateCommandLine(const FileData& game, const EmulatorData& e
          .Replace("%EMULATOR%", emulator.Emulator())
          .Replace("%RATIO%", game.Metadata().RatioAsString())
          .Replace("%NETPLAY%", NetplayOption(game, data.NetPlay()))
-         .Replace("%CRT%", BuildCRTOptions(data.Crt(), RotationManager::ShouldRotateGame(game), demo));
+         .Replace("%CRT%", BuildCRTOptions(game.System(), data.Crt(), RotationManager::ShouldRotateGame(game), demo));
 
   if (debug) command.Append(" -verbose");
 
@@ -131,19 +130,23 @@ String GameRunner::CreateCommandLine(const FileData& game, const EmulatorData& e
            && data.Patch().PatchPath().Directory() != game.RomPath().Directory())
   {
     // launch with a selected path in xxxxx-patches directory
-    const String patchPAthEscaped = data.Patch().PatchPath().MakeEscaped();
+    const String patchPathEscaped = data.Patch().PatchPath().MakeEscaped();
     if (data.Patch().PatchPath().Extension() == ".ips")
-      command.Append(" -ips ").Append(patchPAthEscaped);
+      command.Append(" -ips ").Append(patchPathEscaped);
     else if (data.Patch().PatchPath().Extension() == ".bps")
-      command.Append(" -bps ").Append(patchPAthEscaped);
+      command.Append(" -bps ").Append(patchPathEscaped);
     else if (data.Patch().PatchPath().Extension() == ".ups")
-      command.Append(" -ups ").Append(patchPAthEscaped);
+      command.Append(" -ups ").Append(patchPathEscaped);
   }
   if(data.SuperGameBoy().ShouldEnable(game.System()))
     command.Append(" -sgb ")
            .Replace("%CORE%", data.SuperGameBoy().Core(game, core));
   else
     command.Replace("%CORE%", core);
+
+  if(data.Jamma().ShouldConfigureJammaConfiggen()){
+    command.Append(" -jammalayout ").Append(data.Jamma().JammaControlType(game, emulator));
+  }
 
   return command;
 }
@@ -156,7 +159,7 @@ bool GameRunner::RunGame(FileData& game, const EmulatorData& emulator, const Gam
   { LOG(LogInfo) << "[Run] Launching game"; }
 
   bool debug = RecalboxConf::Instance().GetDebugLogs();
-  InputMapper mapper(nullptr);
+  InputMapper& mapper = InputManager::Instance().Mapper();
   OrderedDevices controllers = InputManager::Instance().GetMappedDeviceList(mapper);
   const String& core = data.NetPlay().NetplayMode() == NetPlayData::Mode::Client ? data.NetPlay().CoreName() : emulator.Core();
 
@@ -181,11 +184,18 @@ bool GameRunner::RunGame(FileData& game, const EmulatorData& emulator, const Gam
     Board::Instance().SetCPUGovernance(GetGovernance(core));
     Board::Instance().StartInGameBackgroundProcesses(sdl2Runner);
     fputs("==============================================\n", stdout);
+
+    auto start = std::chrono::steady_clock::now();
+
     // Start game thread
     ThreadRunner gameRunner(sdl2Runner, command, debug);
     // Start sdl2 loop
     sdl2Runner.Run();
     exitCode = gameRunner.ExitCode();
+
+    auto end = std::chrono::steady_clock::now();
+    long gameDuration = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
+
     fputs("==============================================\n", stdout);
     Board::Instance().StopInGameBackgroundProcesses(sdl2Runner);
     Board::Instance().SetFrontendCPUGovernor();
@@ -193,7 +203,12 @@ bool GameRunner::RunGame(FileData& game, const EmulatorData& emulator, const Gam
     padToKeyboard.StopMapping();
 
     if (exitCode != 0) { LOG(LogWarning) << "[Run] Non-Zero exit code " << exitCode << " !"; }
-    else LOG(LogInfo) << "[Run] No error running " << path.ToString();
+    else
+    {
+      LOG(LogInfo) << "[Run] No error running " << path.ToString();
+      // Update time played
+      game.Metadata().SetTimePlayed(game.Metadata().TimePlayed() + (int) gameDuration);
+    }
   }
 
   SubSystemRestore();
@@ -202,44 +217,32 @@ bool GameRunner::RunGame(FileData& game, const EmulatorData& emulator, const Gam
   game.Metadata().IncPlayCount();
 
   // Update last played time
-  mSystemManager.UpdateLastPlayedSystem(game);
   game.Metadata().SetLastPlayedNow();
-
-  if (RecalboxConf::Instance().GetScraperLocal()){
-    // Update image path (coded by novan)
-    String imgPath = game.RomPath().Directory().ToString();
-    imgPath.Append("/media/images/");
-    imgPath.Append(game.RomPath().FilenameWithoutExtension());
-    imgPath.Append(".png");
-    game.Metadata().SetImagePathAsString(imgPath);
-    
-    // Refresh (new) Image to be displayed (coded by novan)
-    SystemData* systemData = ViewController::Instance().CurrentSystem();
-    ViewController::Instance().GetOrCreateGamelistView(systemData)->Update(1000);
-  }else{
-    LOG(LogInfo) << "[Run] ScraperLocal disable for " << path.ToString();
-  }
 
   return exitCode == 0;
 }
 
 void GameRunner::SubSystemPrepareForRun()
 {
-  if (VideoEngine::IsInstantiated())
-    VideoEngine::Instance().StopVideo(false);
-  AudioManager::Instance().Deactivate();
-  WindowManager::Finalize();
+  if(mWindowManager != nullptr) {
+    if (VideoEngine::IsInstantiated())
+      VideoEngine::Instance().StopVideo(false);
+    AudioManager::Instance().Deactivate();
+    WindowManager::Finalize();
+  }
 }
 
 void GameRunner::SubSystemRestore()
 {
-  // Reinit
-  Sdl2Init::Finalize();
-  Sdl2Init::Initialize();
-  mWindowManager.ReInitialize();
-  mWindowManager.normalizeNextUpdate();
-  AudioManager::Instance().Reactivate();
-  InputManager::Instance().Refresh(&mWindowManager, false);
+  if(mWindowManager != nullptr) {
+    // Reinit
+    Sdl2Init::Finalize();
+    Sdl2Init::Initialize();
+    mWindowManager->ReInitialize();
+    mWindowManager->normalizeNextUpdate();
+    AudioManager::Instance().Reactivate();
+    InputManager::Instance().Refresh(mWindowManager, false);
+  }
 }
 
 bool
@@ -250,7 +253,7 @@ GameRunner::DemoRunGame(const FileData& game, const EmulatorData& emulator, int 
 
   { LOG(LogInfo) << "[Run] Launching game demo..."; }
 
-  InputMapper mapper(nullptr);
+  InputMapper& mapper = InputManager::Instance().Mapper();
   bool debug = RecalboxConf::Instance().GetDebugLogs();
 
   String command = CreateCommandLine(game, emulator, emulator.Core(), GameLinkedData(), mapper, debug, true);
@@ -324,7 +327,7 @@ String GameRunner::NetplayOption(const FileData& game, const NetPlayData& netpla
 bool GameRunner::RunKodi()
 {
   { LOG(LogInfo) << "[System] Attempting to launch kodi..."; }
-  InputMapper mapper(nullptr);
+  InputMapper& mapper = InputManager::Instance().Mapper();
   SubSystemPrepareForRun();
   String command = "configgen -system kodi -rom '' " + InputManager::Instance().GetMappedDeviceListConfiguration(mapper);
   // Forced resolution
@@ -391,7 +394,7 @@ bool GameRunner::RunKodi()
   return exitCode == 0;
 }
 
-String GameRunner::BuildCRTOptions(const CrtData& data, const RotationType rotation, const bool demo)
+String GameRunner::BuildCRTOptions(const SystemData& system, const CrtData& data, const RotationType rotation, const bool demo)
 {
   (void)rotation;
   String result;
@@ -399,9 +402,7 @@ String GameRunner::BuildCRTOptions(const CrtData& data, const RotationType rotat
   const ICrtInterface& crtBoard = Board::Instance().CrtBoard();
   if (crtBoard.IsCrtAdapterAttached())
   {
-    result.Append(" -crtadaptor ").Append("present");
-    result.Append(" -crtscreentype ").Append(crtBoard.GetHorizontalFrequency() == ICrtInterface::HorizontalFrequency::KHz15 ?
-                                             (CrtConf::Instance().GetSystemCRTExtended15KhzRange() ? "15kHzExt" : "15kHz") : "31kHz");
+    result.Append(" -crtadaptor ").Append(crtBoard.ShortName());
     result.Append(" -crtsuperrez ").Append(CrtConf::Instance().GetSystemCRTSuperrez());
     // CRTV2 will be forced by user, or for tate mode
     if(CrtConf::Instance().GetSystemCRTUseV2())
@@ -418,6 +419,7 @@ String GameRunner::BuildCRTOptions(const CrtData& data, const RotationType rotat
     // Resolution type
     if(crtBoard.GetHorizontalFrequency() == ICrtInterface::HorizontalFrequency::KHz31)
     {
+      result.Append(" -crtscreentype ").Append( "31kHz");
       // force 240p only if game resolution select is active and 240p is selected
       if(demo)
         result.Append(" -crtresolutiontype ").Append(CrtConf::Instance().GetSystemCRTRunDemoIn240pOn31kHz() ? "doublefreq" : "progressive");
@@ -427,59 +429,78 @@ String GameRunner::BuildCRTOptions(const CrtData& data, const RotationType rotat
         result.Append(" -crtresolutiontype ").Append("progressive");
       result.Append(" -crtvideostandard ntsc");
       // Scanlines
-      if(CrtConf::Instance().GetSystemCRTScanlines31kHz())
-        result.Append(" -crtscanlines 1");
+      if(data.Scanlines(system) != CrtScanlines::None)
+        result.Append(" -crtscanlines ").Append(CrtConf::CrtScanlinesFromEnum(data.Scanlines(system)));
+    }
+    else if(crtBoard.GetHorizontalFrequency() == ICrtInterface::HorizontalFrequency::KHzMulti)
+    {
+      // Always progressive in multisync
+      result.Append(" -crtresolutiontype progressive");
+      // Always 60Hz
+      result.Append(" -crtvideostandard ntsc");
+      // Choice have been made by the user or have been automatically done
+      if(data.HighResolution())
+      {
+        result.Append(" -crtscreentype ").Append("31kHz");
+        // Scanlines
+        if(data.Scanlines(system) != CrtScanlines::None)
+          result.Append(" -crtscanlines ").Append(CrtConf::CrtScanlinesFromEnum(data.Scanlines(system)));
+      }
+      else
+        result.Append(" -crtscreentype ").Append( (CrtConf::Instance().GetSystemCRTExtended15KhzRange() ? "15kHzExt" : "15kHz"));
+
     }
     else
     {
       result.Append(" -crtresolutiontype ").Append(data.HighResolution() ? "interlaced" : "progressive");
-
-        result.Append(" -crtvideostandard ");
-        // Force pal if switch 50hz
-        if (crtBoard.MustForce50Hz())
+      result.Append(" -crtscreentype ").Append( (CrtConf::Instance().GetSystemCRTExtended15KhzRange() ? "15kHzExt" : "15kHz"));
+      result.Append(" -crtvideostandard ");
+      // Force pal if switch 50hz
+      if (crtBoard.MustForce50Hz())
+      {
+        result.Append("pal");
+      } else
+      {
+        switch (data.VideoStandard())
         {
+          case CrtData::CrtVideoStandard::PAL:
             result.Append("pal");
-        } else
-        {
-            switch (data.VideoStandard())
-            {
-                case CrtData::CrtVideoStandard::PAL:
-                    result.Append("pal");
-                    break;
-                case CrtData::CrtVideoStandard::NTSC:
-                    result.Append("ntsc");
-                    break;
-                case CrtData::CrtVideoStandard::AUTO:
-                default:
-                    result.Append("auto");
-                    break;
-            }
+            break;
+          case CrtData::CrtVideoStandard::NTSC:
+            result.Append("ntsc");
+            break;
+          case CrtData::CrtVideoStandard::AUTO:
+          default:
+            result.Append("auto");
+            break;
         }
+      }
 
-        result.Append(" -crtregion ");
-        // Force eu if switch 50hz
-        if (crtBoard.MustForce50Hz())
+      result.Append(" -crtregion ");
+      // Force eu if switch 50hz
+      if (crtBoard.MustForce50Hz())
+      {
+        result.Append("eu");
+      }
+      else
+      {
+        switch (data.Region())
         {
+          case CrtData::CrtRegion::EU:
             result.Append("eu");
-        } else
-        {
-            switch (data.Region())
-            {
-                case CrtData::CrtRegion::EU:
-                    result.Append("eu");
-                    break;
-                case CrtData::CrtRegion::US:
-                    result.Append("us");
-                    break;
-                case CrtData::CrtRegion::JP:
-                    result.Append("jp");
-                    break;
-                case CrtData::CrtRegion::AUTO:
-                default:
-                    result.Append("auto");
-                    break;
-            }
+            break;
+          case CrtData::CrtRegion::US:
+            result.Append("us");
+            break;
+          case CrtData::CrtRegion::JP:
+            result.Append("jp");
+            break;
+          case CrtData::CrtRegion::AUTO:
+          default:
+            result.Append("auto");
+            break;
         }
+      }
     }
   }
 

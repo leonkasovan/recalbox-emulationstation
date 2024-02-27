@@ -48,12 +48,12 @@ class Rectangle
     {
     }
 
-    float Left()   const { return mX; }
-    float Top()    const { return mY; }
-    float Right()  const { return mX + mW - 1; }
-    float Bottom() const { return mY + mH - 1; }
-    float Width()  const { return mW; }
-    float Height() const { return mH; }
+    [[nodiscard]] float Left()   const { return mX; }
+    [[nodiscard]] float Top()    const { return mY; }
+    [[nodiscard]] float Right()  const { return mX + mW - 1; }
+    [[nodiscard]] float Bottom() const { return mY + mH - 1; }
+    [[nodiscard]] float Width()  const { return mW; }
+    [[nodiscard]] float Height() const { return mH; }
 
     Rectangle& Contract(const Vector2f& by)
     {
@@ -107,6 +107,24 @@ class Rectangle
       return *this;
     }
 
+    Rectangle& Swallow(const Rectangle& other)
+    {
+      if (other.mX < mX) { mW += mX - other.mX; mX = other.mX; }
+      if (other.mY < mY) { mH += mY - other.mY; mY = other.mX; }
+      if (other.mX + other.mW > mX + mW) mW = other.mX + other.mW - mX;
+      if (other.mY + other.mH > mY + mH) mW = other.mY + other.mH - mY;
+      return *this;
+    }
+
+    Rectangle& Swallow(float x, float y, float w, float h)
+    {
+      if (x < mX) { mW += mX - x; mX = x; }
+      if (y < mY) { mH += mY - y; mY = x; }
+      if (x + w > mX + mW) mW = x + w - mX;
+      if (y + h > mY + mH) mW = y + h - mY;
+      return *this;
+    }
+    
     Rectangle& Move(const Vector2f& by)
     {
       mX += by.x();

@@ -12,40 +12,15 @@
 #include "GuiSearch.h"
 #include "GuiNetPlayHostPasswords.h"
 #include <VideoEngine.h>
-#include <cstdarg>
-#include <cstring>
-#include <vector>
-#include <utils/Log.h>
 #include <dirent.h>
-
-#define MAX_LINE 2048
-
-std::string Format(const char* _string, ...)
-{
-	va_list	args;
-	va_list copy;
-
-	va_start(args, _string);
-
-	va_copy(copy, args);
-	const int length = vsnprintf(nullptr, 0, _string, copy);
-	va_end(copy);
-
-	std::string result;
-	result.resize(length);
-	va_copy(copy, args);
-	vsnprintf((char*)result.c_str(), (size_t)length + 1, _string, copy);
-	va_end(copy);
-
-	va_end(args);
-
-	return result;
-} // format
+#include <guis/GuiDownloadFile.h>
 
 #define BUTTON_GRID_VERT_PADDING Renderer::Instance().DisplayHeightAsFloat() * 0.025f
 #define BUTTON_GRID_HORIZ_PADDING 10
 
 #define TITLE_HEIGHT (mTitle->getFont()->getLetterHeight() + Renderer::Instance().DisplayHeightAsFloat()*0.0437f )
+
+#define MAX_LINE 2048
 
 GuiSearch::GuiSearch(WindowManager& window, SystemManager& systemManager)
   : Gui(window)
@@ -190,6 +165,7 @@ GuiSearch::~GuiSearch()
   {
     mList->clear();
   }
+  mSR2.clear();
 }
 
 float GuiSearch::getButtonGridHeight() const
@@ -213,11 +189,13 @@ bool GuiSearch::ProcessInput(const class InputCompactEvent & event)
   }
   else if (event.ValidPressed())
   {
-    // clear();
-    if ((size_t)mList->getCursor() < mSearchResults.size()){
+    if ((size_t)mList->getCursor() < mSearchResults.size()){  // launch selected rom
+      clear();
       launch();
-    }else{
-      download();
+    }else{  // download selected rom to system
+      if (mList->size() == 0) return true;
+      int ii = mList->getCursor() - mSearchResults.size();
+      mWindow.pushGui(new GuiDownloadFile(mWindow, mSR2[ii].url, mSR2[ii].system));
     }
     
     return true;
@@ -385,37 +363,6 @@ void GuiSearch::clear()
   mMDPublisher->setText("");
   mMDDeveloperLabel->setText("");
   mMDDeveloper->setText("");
-  { LOG(LogDebug) << "[GuiSearch] Line=" << __LINE__; }
-}
-
-// Function to format a string of digits with periods
-String formatWithPeriods(const char* input_str) {
-    String res;
-    int input_length = strlen(input_str);
-
-    // Calculate the length of the formatted string
-    int formatted_length = input_length + (input_length - 1) / 3;
-
-    // Allocate memory for the formatted string (including the null terminator)
-    char* formatted_str = (char*)malloc(formatted_length + 1);
-
-    if (formatted_str != NULL) {
-        int input_position = 0;
-
-        for (int i = 0; i < formatted_length; i++) {
-            if ((formatted_length - i) % 4 == 0) {
-                formatted_str[i] = '.';
-            } else {
-                formatted_str[i] = input_str[input_position++];
-            }
-        }
-
-        formatted_str[formatted_length] = '\0';
-    }
-    res = formatted_str;
-    free(formatted_str);
-
-    return res;
 }
 
 //called when changing cursor in mList to populate MD
@@ -426,17 +373,14 @@ void GuiSearch::populateGridMeta(int i)
     int ii = i - mSearchResults.size();
 
     // clear();
-    mMDPublisherLabel->setText("Filename : ");
-    mMDDeveloperLabel->setText("Filesize : ");
-    if (mSR2[ii].parent.empty())
-      mMDPublisher->setText(mSR2[ii].filename);
-    else
-      mMDPublisher->setText(mSR2[ii].filename + " (clone of "+mSR2[ii].parent+")");
-    mMDDeveloper->setText(formatWithPeriods(mSR2[ii].size.c_str()));
-    mResultDesc->setText("Title: " + mSR2[ii].title + " ("+mSR2[ii].year+")\n" +
-                        "Company: " + mSR2[ii].company + "\n" + 
-                        "Hardware: " + mSR2[ii].hardware + "\n" + 
-                        (mSR2[ii].status.empty()?"":("Status: " + mSR2[ii].status + "\n")));
+    mMDPublisherLabel->setText("System : ");
+    mMDDeveloperLabel->setText("Title : ");
+    mMDPublisher->setText(mSR2[ii].system);
+    { LOG(LogDebug) << "[GuiSearch] mSR2[ii].system:" << mSR2[ii].system; }
+    mMDDeveloper->setText(mSR2[ii].title);
+    { LOG(LogDebug) << "[GuiSearch] mSR2[ii].title:" << mSR2[ii].title; }
+    mResultDesc->setText(mSR2[ii].desc);
+    { LOG(LogDebug) << "[GuiSearch] mSR2[ii].desc:" << mSR2[ii].desc; }
     mDescContainer->setSize(mGridMeta->getColWidth(2) + mGridMeta->getColWidth(3), mGridMeta->getRowHeight(2)*0.9f);
     mResultDesc->setSize(mDescContainer->getSize().x(), 0); // make desc text wrap at edge of container
 
@@ -445,28 +389,30 @@ void GuiSearch::populateGridMeta(int i)
     if (system){
       mResultSystemLogo->applyTheme(system->Theme(), "system", "logo", ThemeProperties::Path);
       mGridLogoAndMD->setRowHeightPerc(0, 0.5f);
-      mResultSystemLogo->setMaxSize(mGridLogo->getSize().x() * 0.8f, mGridLogo->getSize().y() * 0.8f);
+      mResultSystemLogo->setResize(mGridLogo->getSize().x() * 0.8f, mGridLogo->getSize().y() * 0.8f);
       ResizeGridLogo();
     }
     
     //screenshot
     mResultThumbnail->setImage(Path(":/no_image.png"));
-    mResultThumbnail->setMaxSize(mGridMeta->getColWidth(2) * 0.9f, mGridMeta->getRowHeight(1)*0.9f);
+    mResultThumbnail->setResize(mGridMeta->getColWidth(2) * 0.9f, mGridMeta->getRowHeight(1)*0.9f);
 
     updateHelpPrompts();
     return;
   }
-  
+
   //screenshot & video
   mResultThumbnail->setImage(mSearchResults[i]->Metadata().Image());
-  mResultThumbnail->setMaxSize(mGridMeta->getColWidth(2) * 0.9f, mGridMeta->getRowHeight(1)*0.9f);
+  mResultThumbnail->setResize(mGridMeta->getColWidth(2) * 0.9f, mGridMeta->getRowHeight(1)*0.9f);
+  mResultThumbnail->setKeepRatio(true);
   mResultVideo->setVideo(mSearchResults[i]->Metadata().Video(), 2000, 1);
   mResultVideo->setMaxSize(mGridMeta->getColWidth(2) * 0.9f, mGridMeta->getRowHeight(1)*0.9f);
 
   //system logo retieved from theme
   mResultSystemLogo->applyTheme(mSearchResults[i]->System().Theme(), "system", "logo", ThemeProperties::Path);
   mGridLogoAndMD->setRowHeightPerc(0, 0.5f);
-  mResultSystemLogo->setMaxSize(mGridLogo->getSize().x() * 0.8f, mGridLogo->getSize().y() * 0.8f);
+  mResultSystemLogo->setResize(mGridLogo->getSize().x() * 0.8f, mGridLogo->getSize().y() * 0.8f);
+  mResultSystemLogo->setKeepRatio(true);
   ResizeGridLogo();
 
   //Metadata
@@ -516,7 +462,7 @@ void GuiSearch::launch()
 
     int index = mList->getCursor();
     Vector3f target(Renderer::Instance().DisplayWidthAsFloat() / 2.0f, Renderer::Instance().DisplayHeightAsFloat() / 2.0f, 0);
-    ViewController::Instance().Launch(mSearchResults[index], GameLinkedData(), target);
+    ViewController::Instance().Launch(mSearchResults[index], GameLinkedData(), target, true);
   }
 }
 
@@ -541,11 +487,34 @@ void GuiSearch::ArcadeVirtualKeyboardTextChange(GuiArcadeVirtualKeyboard& /*vk*/
 void GuiSearch::ArcadeVirtualKeyboardValidated(GuiArcadeVirtualKeyboard& /*vk*/, const String& text)
 {
   mSearch->setValue(text);
+  mSR2.clear();
   PopulateGrid2(text);
 }
 
 void GuiSearch::ArcadeVirtualKeyboardCanceled(GuiArcadeVirtualKeyboard& /*vk*/)
 {
+}
+
+std::string Format(const char* _string, ...)
+{
+	va_list	args;
+	va_list copy;
+
+	va_start(args, _string);
+
+	va_copy(copy, args);
+	const int length = vsnprintf(nullptr, 0, _string, copy);
+	va_end(copy);
+
+	std::string result;
+	result.resize(length);
+	va_copy(copy, args);
+	vsnprintf((char*)result.c_str(), (size_t)length + 1, _string, copy);
+	va_end(copy);
+
+	va_end(args);
+
+	return result;
 }
 
 // Split and allocate memory
@@ -649,7 +618,7 @@ int GuiSearch::SearchCSV(const char *csv_fname, char **lword, unsigned int start
 	FILE *f;
 	char line[MAX_LINE];
 	char *category = NULL, *base_url = NULL, *p;
-	char *a_name, *a_title, *a_company, *a_hardware, *a_year, *a_parent, *a_status, *a_relative_url, *a_size; //db_fbneo.csv
+	char *a_name, *a_title, *a_desc;
 
 	f = fopen(csv_fname, "r");
 	if (!f) {
@@ -685,28 +654,22 @@ int GuiSearch::SearchCSV(const char *csv_fname, char **lword, unsigned int start
 	while (fgets(line, MAX_LINE, f)) { // Process next line: the real csv data
 		a_name = my_strtok(line, '|');
 		a_title = my_strtok(NULL, '|');
-    a_company = my_strtok(NULL, '|');
-		a_hardware = my_strtok(NULL, '|');
-    a_year = my_strtok(NULL, '|');
-    a_parent = my_strtok(NULL, '|');
-    a_status = my_strtok(NULL, '|');
-    a_relative_url = my_strtok(NULL, '|');
-    a_size = my_strtok(NULL, '|');
+    a_desc = my_strtok(NULL, '|');
 
     // add to list if keyword is found in title and rom file doesn't exists 
 		if (find_keyword2(a_title, lword) && !Path(Format("/recalbox/share/roms/%s/%s.zip", category, a_name)).Exists()) {
 			start_no++;
 			
-			// remove trailing end-of-line in a_size
-			p = strrchr(a_size, '\r'); // windows end of line
+			// remove trailing end-of-line in a_desc
+			p = strrchr(a_desc, '\r'); // windows end of line
 			if (p) {
 				*p = '\0';	// replace \r to \0
 			}else{
-				p = strrchr(a_size, '\n');
+				p = strrchr(a_desc, '\n');
 				if (p) *p = '\0';	// replace \n to \0
 			}
       
-      mSR2.emplace_back(category, Format("%s.zip", a_name), a_title, a_company, a_hardware, a_year, a_parent, a_status, Format("%s/%s", base_url, a_relative_url), a_size);
+      mSR2.emplace_back(category, a_title, Format("%s/%s", base_url, a_name), a_desc);
 
       SystemData* system = mSystemManager.SystemByName(category);
       String prefix = system?system->Descriptor().IconPrefix():"";
@@ -761,164 +724,4 @@ void GuiSearch::PopulateGrid2(const String& search)
 	}
 
   if (n_found) mText->setValue("");
-}
-
-void GuiSearch::download()
-{
-  String msg;
-  if (mList->size() == 0) return;
-  int ii = mList->getCursor() - mSearchResults.size();
-
-  // try to download ROM's parent
-  if (!mSR2[ii].parent.empty()){
-    mSR2[ii].parent.Append(".zip");
-    // if parent not exists then download
-    if (!Path("/recalbox/share/roms/"+mSR2[ii].system+"/"+mSR2[ii].parent).Exists()){
-        String parent_url = mSR2[ii].url;
-
-        parent_url.Replace(mSR2[ii].filename,mSR2[ii].parent);
-        // mWindow.InfoPopupAdd(new GuiInfoPopup(mWindow, "Start downloading ROM's parent: "+mSR2[ii].parent, 8, PopupType::Scraper));
-        if (mRequest.Execute(parent_url, Path("/recalbox/share/roms/"+mSR2[ii].system+"/"+mSR2[ii].parent))){
-          { LOG(LogError) << "[GuiSearch] Success downloding Parent " << mSR2[ii].parent; }
-          msg = "Success downloading Parent ROM "+mSR2[ii].parent+".\n";
-        }else{
-          { LOG(LogError) << "[GuiSearch] Error downloding " << mSR2[ii].url; }
-          msg = "Error downloading Parent ROM "+mSR2[ii].parent+".\n";
-        }      
-    }
-  } 
-
-  // download the rom
-  // mWindow.InfoPopupAdd(new GuiInfoPopup(mWindow, "Start downloading ROM: "+mSR2[ii].filename, 8, PopupType::Scraper));
-  if (mRequest.Execute(mSR2[ii].url, Path("/recalbox/share/roms/"+mSR2[ii].system+"/"+mSR2[ii].filename))){
-    { LOG(LogError) << "[GuiSearch] Success downloding " << mSR2[ii].url; }
-    msg.Append("Success downloading ROM "+mSR2[ii].filename);
-  }else{
-    { LOG(LogError) << "[GuiSearch] Error downloding " << mSR2[ii].url; }
-    msg.Append("Error downloading ROM "+mSR2[ii].filename);
-  }
-  mWindow.InfoPopupAdd(new GuiInfoPopup(mWindow, msg, 6, PopupType::Scraper));
-}
-
-// to be edited here ======================
-#include <guis/GuiInfoPopupBase.h>
-
-class GuiInfoPopupDownloader : public GuiInfoPopupBase
-                    , IGuiInfoPopupDownloaderUpdater
-{
-  public:
-
-
-    GuiInfoPopupDownloader(WindowManager& window, SystemData& system);
-    ~GuiInfoPopupDownloader() override {}
-    bool ProcessInput(const InputCompactEvent& event) override;
-    bool getHelpPrompts(Help& help) override;
-
-    /*
-     * IGuiDownloadUpdater implementation
-     */
-    void UpdateProgressbar(long long value, long long total) override;
-    void UpdateMainText(const String& text) override;
-    void UpdateTitleText(const String& text) override;
-    void UpdateETAText(const String& text) override;
-    void DownloadComplete(SystemData& system, bool aborted) override;
-
-  private:
-    //! Download manager private instance
-    DownloaderManager mDownloadManager;
-    //! Active downloader
-    BaseSystemDownloader* mDownloader;
-
-    ComponentGrid mGrid;
-
-    //std::shared_ptr<TextComponent> mTitle;
-    std::shared_ptr<TextComponent> mText;
-    std::shared_ptr<ProgressBarComponent> mBar;
-    //std::shared_ptr<TextComponent> mEta;
-};
-
-GuiInfoPopupDownloader::GuiInfoPopupDownloader(WindowManager& window, SystemData& system)
-  : GuiInfoPopupBase(window, true, 0x7FFFFFF, PopupType::Scraper, 3, 2, 1.6f)
-{
-}
-
-float GuiInfoPopupDownloader::AddComponents(WindowManager& window, ComponentGrid& grid, float maxWidth, float maxHeight,
-                                         int paddingX, int paddingY)
-{
-  (void)paddingY;
-  String iconText = "\uF1e4";
-
-  auto menuTheme = MenuThemeData::getInstance()->getCurrentTheme();
-  float hwSize = Math::min(Renderer::Instance().DisplayHeightAsFloat(), Renderer::Instance().DisplayWidthAsFloat());
-  unsigned int FONT_SIZE_ICON = (unsigned int)(0.04f * hwSize);
-  unsigned int FONT_SIZE_TEXT = (unsigned int)(0.02f * hwSize);
-
-  if(Renderer::Instance().Is480pOrLower())
-  {
-    FONT_SIZE_ICON = menuTheme->menuText.font->getSize();
-    FONT_SIZE_TEXT = menuTheme->menuText.font->getSize();
-  }
-
-  mText        = std::make_shared<TextComponent>(window, mTextTemplate + '\n', Font::get((int)FONT_SIZE_TEXT), menuTheme->menuText.color, TextAlignment::Top);
-  mIcon        = std::make_shared<TextComponent>(window, iconText, Font::get((int)FONT_SIZE_ICON), menuTheme->menuText.color, TextAlignment::Left);
-  mProgressBar = std::make_shared<ProgressBarComponent>(window, 1);
-  mImage       = std::make_shared<ImageComponent>(window);
-  mNoImage     = std::make_shared<ImageComponent>(window);
-
-  grid.setEntry(mIcon       , Vector2i(0, 0), false, false);
-  grid.setEntry(mText       , Vector2i(1, 0), false, false);
-  grid.setEntry(mImage      , Vector2i(2, 0), false, false);
-  grid.setEntry(mNoImage    , Vector2i(2, 0), false, false);
-  grid.setEntry(mProgressBar, Vector2i(0, 1), false, false, Vector2i(3, 1));
-
-  mText->setSize(maxWidth - mIcon->getSize().y(), 0);
-  float msgHeight = Math::min(maxHeight, Math::max(mText->getSize().y(), mIcon->getSize().y()));
-  grid.setColWidthPerc(0, (float)(mIcon->getFont()->getSize() + paddingX) / maxWidth);
-  grid.setColWidthPerc(2, (msgHeight * 1.5f) / maxWidth);
-  grid.setRowHeightPerc(1, 0.16f);
-  mProgressBar->setSize(maxWidth, 0);
-  mImage->setResize(0.f, msgHeight * 0.9f);
-  mNoImage->setResize(0.f, msgHeight * 0.9f);
-  mNoImage->setImage(Path(":/no_image.png"));
-
-  mText->setText("Scraper starting...");
-
-  return msgHeight * 1.16f;
-}
-
-void GuiInfoPopupDownloader::UpdateProgressbar(long long int value, long long int total)
-{
-  mBar->setMaxValue(total);
-  mBar->setCurrentValue(value);
-  mGrid.onSizeChanged();
-}
-
-void GuiInfoPopupDownloader::UpdateMainText(const String& text)
-{
-  mText->setText(text);
-  mGrid.onSizeChanged();
-}
-
-void GuiInfoPopupDownloader::UpdateETAText(const String& text)
-{
-  mEta->setText(text);
-  mGrid.onSizeChanged();
-}
-
-void GuiInfoPopupDownloader::DownloadComplete(SystemData& system, bool aborted)
-{
-  if (!aborted)
-  {
-    ViewController& vc = ViewController::Instance();
-    vc.InvalidateGamelist(&system);
-    vc.getSystemListView().manageSystemsList();
-    vc.getSystemListView().setSelectedName(system.Name());
-  }
-  mWindow.CloseAll();
-}
-
-void GuiInfoPopupDownloader::UpdateTitleText(const String& text)
-{
-  mTitle->setText(text);
-  mGrid.onSizeChanged();
 }

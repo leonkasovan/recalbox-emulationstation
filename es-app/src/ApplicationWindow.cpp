@@ -60,7 +60,8 @@ void ApplicationWindow::EnableOSDImage(const Path& imagePath, float x, float y, 
     x = y = 0.5f;
   }
   mOSD.setPosition(x * Renderer::Instance().DisplayWidthAsFloat(), y * Renderer::Instance().DisplayHeightAsFloat());
-  mOSD.setMaxSize(width * Renderer::Instance().DisplayWidthAsFloat(), height * Renderer::Instance().DisplayHeightAsFloat());
+  mOSD.setResize(width * Renderer::Instance().DisplayWidthAsFloat(), height * Renderer::Instance().DisplayHeightAsFloat());
+  mOSD.setKeepRatio(true);
   mOSD.setOpacity((unsigned char)(alpha * 255));
   mActiveOSD = true;
 }

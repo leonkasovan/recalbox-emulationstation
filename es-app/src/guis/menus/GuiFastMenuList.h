@@ -71,5 +71,6 @@ class GuiFastMenuList : public GuiMenuBase
     {
       if (mInterface != nullptr)
         mInterface->FastMenuLineSelected(mMenuIndex, id);
+      Close();
     }
 };

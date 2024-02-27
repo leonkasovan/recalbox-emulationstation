@@ -32,17 +32,11 @@ set_property(CACHE GLSystem PROPERTY STRINGS "Desktop OpenGL" "OpenGL ES")
 
 #-------------------------------------------------------------------------------
 # finding GL compatible library
-MESSAGE("Looking for OpenGL or OpenGLES")
+MESSAGE("OpenGLES")
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(OPENGL gl)
-#pkg_check_modules(EGL egl)
 pkg_check_modules(OPENGLES glesv2)
-if(OPENGL_FOUND)
-    MESSAGE("OpenGL found ${OPENGL_LIBRARIES}")
-    find_package(OpenGL REQUIRED)
-elseif(OPENGLES_FOUND)
+if(OPENGLES_FOUND)
     MESSAGE("OpenGLES found ${OPENGLES_LIBRARIES}")
-    find_package(OpenGLES REQUIRED)
     set(GLSystem "OpenGL ES")
 else()
     MESSAGE(FATAL_ERROR "OpenGL or OpenGLES required!")
@@ -52,13 +46,14 @@ pkg_check_modules(BCMHOST bcm_host)
 
 #-------------------------------------------------------------------------------
 # finding necessary packages
-find_package(Freetype REQUIRED)
+pkg_check_modules(FREETYPE freetype2)
 find_package(FreeImage REQUIRED)
 find_package(SDL2MIXER REQUIRED)
-find_package(SDL2 REQUIRED) 
+find_package(SDL2 REQUIRED)
 find_package(CURL REQUIRED)
 find_package(PulseAudio REQUIRED)
 find_package(LibLZMA REQUIRED)
+pkg_check_modules(UDEV libudev)
 
 #-------------------------------------------------------------------------------
 #set up compiler flags and excutable names
@@ -92,6 +87,10 @@ if(CMAKE_COMPILER_IS_GNUCXX)
         set(OPTION_RECALBOX_EASY_DEBUG "-DFREEZE_MQTT=1 -DSLOW_LOADING=1")
     endif()
 
+    if(OPTION_RECALBOX_SIMULATE_RRGBD)
+        set(OPTION_RECALBOX_EASY_DEBUG "-DOPTION_RECALBOX_SIMULATE_RRGBD=1")
+    endif()
+
     #set up compiler flags for GCC
 	if (CMAKE_BUILD_TYPE MATCHES Debug)
         # -fsanitize=address -fsanitize-address-use-after-scope
@@ -99,14 +98,16 @@ if(CMAKE_COMPILER_IS_GNUCXX)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OPTION_RECALBOX_EASY_DEBUG} ${LIBDRM_INCLUDE} -std=c++20 -DDEBUG -Wno-unknown-pragmas -Wno-attributes -Wswitch-enum -Wswitch -O0 -g -Wall -Wextra -ffunction-sections -fdata-sections -Wl,--gc-sections") #support C++11 for std::, optimize
 		set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -DDEBUG -Wswitch-enum -Wswitch -O0 -g -Wall -Wextra -ffunction-sections -fdata-sections -Wl,--gc-sections")
 	else()
-		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${RECALBOX_PRODUCTION_BUILD} ${LIBDRM_INCLUDE} -Wno-unknown-pragmas -Wno-attributes -O3 -Wall -Wextra -ffunction-sections -fdata-sections -Wl,--gc-sections -DPAHO_MQTT_STATIC=1 -DHIGH_PERFORMANCE=1")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${RECALBOX_PRODUCTION_BUILD} ${LIBDRM_INCLUDE} -Wno-unknown-pragmas -std=c++20 -Wno-attributes -O3 -Wall -Wextra -ffunction-sections -fdata-sections -Wl,--gc-sections") #support C++11 for std::, optimize
-		set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -O3 -Wall -Wextra -ffunction-sections -fdata-sections -Wl,--gc-sections")  #-s = strip binary
+		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${RECALBOX_PRODUCTION_BUILD} ${LIBDRM_INCLUDE} -Wno-unknown-pragmas -Wno-attributes -O3 -Wall -Wextra -ffunction-sections -fdata-sections -Wl,--gc-sections -DPAHO_MQTT_STATIC=1 -DHIGH_PERFORMANCE=1 -DFREEZE_MQTT=1")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${RECALBOX_PRODUCTION_BUILD} ${LIBDRM_INCLUDE} -Wno-unknown-pragmas -std=c++20 -Wno-attributes -O3 -Wall -Wextra -ffunction-sections -fdata-sections -Wl,--gc-sections -DFREEZE_MQTT=1") #support C++11 for std::, optimize
+		set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -O3 -Wall -Wextra -ffunction-sections -fdata-sections -Wl,--gc-sections -s")  #-s = strip binary
 	endif()
 endif()
 
-#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -O1 -fno-omit-frame-pointer -g")
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -O1 -fno-omit-frame-pointer -g")
+if(OPTION_SANITIZERS)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -O0 -fno-omit-frame-pointer -g3")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -O0 -fno-omit-frame-pointer -g3")
+endif()
 
 if(${GLSystem} MATCHES "Desktop OpenGL")
     add_definitions(-DUSE_OPENGL_DESKTOP)
@@ -120,6 +121,7 @@ set(COMMON_INCLUDE_DIRS
     # OSX seems to have a conflicting platform.h somewhere and fails to find
     # getHomePath, so let use our includes paths first.
     ${CMAKE_CURRENT_SOURCE_DIR}/external
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/pistache/include
     ${CMAKE_CURRENT_SOURCE_DIR}/es-app/src
     ${CMAKE_CURRENT_SOURCE_DIR}/es-core/src
     ${FREETYPE_INCLUDE_DIRS}
@@ -127,6 +129,7 @@ set(COMMON_INCLUDE_DIRS
     ${SDL2_INCLUDE_DIR}
     ${CURL_INCLUDE_DIR}
     ${PULSEAUDIO_INCLUDE_DIR}
+    ${UDEV_INCLUDE_DIRS}
 )
 
 if(${GLSystem} MATCHES "Desktop OpenGL")
@@ -153,9 +156,14 @@ set(COMMON_LIBRARIES
     ${PULSEAUDIO_LIBRARY}
     ${LIBDRM_LIBRARY}
     ${LIBLZMA_LIBRARIES}
+    ${UDEV_LIBRARIES}
     pugixml
     nanosvg
     liboping
+    pistache
+    resolv
+    blkid
+    lzma
 )
 
 if(MSVC)
@@ -190,29 +198,31 @@ add_subdirectory("es-app")
 
 
 # i18n
-# find_program (MSGFMT_EXECUTABLE msgfmt)
-# find_program (MSGMERGE_EXECUTABLE msgmerge)
-# find_program (XGETTEXT_EXECUTABLE xgettext)
-# if(MSGFMT_EXECUTABLE AND MSGMERGE_EXECUTABLE AND XGETTEXT_EXECUTABLE)
-# 	message (STATUS "Native language support enabled.")
-# 	add_subdirectory (locale)
-# endif()
-
-# pad to keyb
-#add_subdirectory(tool-pad2keyb)
+#find_program (MSGFMT_EXECUTABLE msgfmt)
+#find_program (MSGMERGE_EXECUTABLE msgmerge)
+#find_program (XGETTEXT_EXECUTABLE xgettext)
+#if(MSGFMT_EXECUTABLE AND MSGMERGE_EXECUTABLE AND XGETTEXT_EXECUTABLE)
+#	message (STATUS "Native language support enabled.")
+#	add_subdirectory (locale)
+#endif()
 
 # Tests
-# add_subdirectory(tests)
+#add_subdirectory(tests)
 
 # md5zip
-# add_subdirectory(tool-md5zip)
+#add_subdirectory(tool-md5zip)
+
+# Web micro-server
+#add_subdirectory(web-server)
 
 message(
         "=========================================================================================================\n"
         "\n"
-        "C    Flags : ${CMAKE_C_FLAGS}\n"
-        "C++  Flags : ${CMAKE_CXX_FLAGS}\n"
-        "Link Flags : ${CMAKE_EXE_LINKER_FLAGS}\n"
+        "C    Flags  : ${CMAKE_C_FLAGS}\n"
+        "C++  Flags  : ${CMAKE_CXX_FLAGS}\n"
+        "Link Flags  : ${CMAKE_EXE_LINKER_FLAGS}\n"
+        "SDL Include : ${SDL2_INCLUDE_DIR}\n"
+        "SDL Library : ${SDL2_LIBRARY}\n"
         "\n"
         "=========================================================================================================\n"
 )

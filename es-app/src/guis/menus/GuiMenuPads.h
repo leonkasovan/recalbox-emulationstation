@@ -9,13 +9,7 @@
 #include <guis/menus/GuiMenuBase.h>
 #include <guis/GuiWaitLongExecution.h>
 #include <input/InputMapper.h>
-#include <mqtt/MqttClient.h>
-
-enum class Command
-{
-    StartDiscovery     = 0x00001,
-    StopDiscovery      = 0x00002,
-};
+#include <btautopair/BTAutopairManager.h>
 
 // Forward declaration
 class SystemManager;
@@ -28,6 +22,8 @@ class GuiMenuPads : public GuiMenuBase
                   , IInputChange
                   , IOptionListComponent<int>
                   , IOptionListComponent<String>
+                  , IOptionListComponent<RecalboxConf::PadOSDType>
+                  , ISwitchComponent
                   , IGuiMenuBase
 {
   public:
@@ -37,6 +33,9 @@ class GuiMenuPads : public GuiMenuBase
      */
     explicit GuiMenuPads(WindowManager& window);
 
+    // Destructor
+    ~GuiMenuPads();
+
   private:
     enum class Components
     {
@@ -45,15 +44,19 @@ class GuiMenuPads : public GuiMenuBase
       Pair,
       Unpair,
       Driver,
+      PadOSD,
+      PadOSDType,
+      AutoPairOnBoot,
     };
 
     //! Pad lists
     std::shared_ptr<OptionListComponent<int>> mDevices[Input::sMaxInputDevices];
 
     //! Pad Mapper
-    InputMapper mMapper;
+    InputMapper& mMapper;
+
     //! Refreshing component, ignore change event
-    bool mRefreshing;
+    volatile bool mRefreshing;
 
     //! MQTT Topic
     static constexpr const char* sEventTopic = "bluetooth/operation";
@@ -75,6 +78,9 @@ class GuiMenuPads : public GuiMenuBase
 
     //! Get modes
     static std::vector<GuiMenuBase::ListEntry<String>> GetModes();
+
+    //! Get modes
+    static std::vector<GuiMenuBase::ListEntry<RecalboxConf::PadOSDType>> GetPadOSDType();
 
     /*
      * ILongExecution
@@ -100,7 +106,7 @@ class GuiMenuPads : public GuiMenuBase
      */
 
     //! Refresh pad list
-    void PadsAddedOrRemoved() override;
+    void PadsAddedOrRemoved(bool removed) override;
 
     /*
      * IGuiMenuBase implementation
@@ -121,9 +127,15 @@ class GuiMenuPads : public GuiMenuBase
     void OptionListComponentChanged(int id, int index, const String& value) override;
 
     /*
-     * @brief convert action enum to string
+     * IOptionListComponent<String> implementation
      */
-    const char* ActionToString(Command action);
+
+    void OptionListComponentChanged(int id, int index, const RecalboxConf::PadOSDType& value) override;
+
+    /*
+     * ISwitchComponent
+     */
+    void SwitchComponentChanged(int id, bool& status) override;
 };
 
 

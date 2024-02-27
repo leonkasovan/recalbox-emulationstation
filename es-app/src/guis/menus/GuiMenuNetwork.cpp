@@ -84,11 +84,14 @@ bool GuiMenuNetwork::ConnectWps(GuiWaitLongExecution<NetworkOperation, bool>& fr
   String ipResult;
   for(int i = 30; --i >= 0; )
   {
-    String finalText(ip.Replace("%i", String(i)));
+    String finalText(ip);
+    finalText.Replace("%i", String(i));
     from.SetText(finalText);
     { LOG(LogDebug) << "[WPS] " << finalText; }
-    if (RecalboxSystem::getIpV4Address(ipResult)) break;
-    if ((i < 5) && RecalboxSystem::getIpV6Address(ipResult)) break;
+    if ((RecalboxSystem::getIpV4WirelessAddress(ipResult) ||
+       ((i < 5) && RecalboxSystem::getIpV6WirelessAddress(ipResult))) &&
+       (RecalboxSystem::hasIpAdress(true)))
+      break;
     Thread::Sleep(1000);
   }
   if (!RecalboxSystem::hasIpAdress(true)) return false;
@@ -219,7 +222,7 @@ void GuiMenuNetwork::EditableComponentTextChanged(int id, const String& text)
   }
 }
 
-void GuiMenuNetwork::SwitchComponentChanged(int id, bool status)
+void GuiMenuNetwork::SwitchComponentChanged(int id, bool& status)
 {
   (void)id;
   // Save state

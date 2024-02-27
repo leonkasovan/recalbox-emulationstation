@@ -7,7 +7,6 @@
 #include "utils/Files.h"
 #include "utils/Zip.h"
 #include "utils/hash/Crc32.h"
-#include "utils/String.h"
 
 GenericDownloader::GenericDownloader(SystemData& system, IGuiDownloaderUpdater& updater)
   : BaseSystemDownloader(updater)
@@ -16,17 +15,6 @@ GenericDownloader::GenericDownloader(SystemData& system, IGuiDownloaderUpdater& 
   , mTotalSize(0)
   , mCurrentSize(0)
   , mGames(0)
-{
-}
-
-GenericDownloader::GenericDownloader(SystemData& system, String url, IGuiDownloaderUpdater& updater)
-  : BaseSystemDownloader(updater)
-  , mSender(*this)
-  , mSystem(system)
-  , mTotalSize(0)
-  , mCurrentSize(0)
-  , mGames(0)
-  , mUrl(url)
 {
 }
 
@@ -49,38 +37,18 @@ void GenericDownloader::DownloadAndInstall()
   if (output.IsEmpty()) { mSender.Send(GenericDownloadingGameState::WriteOnlyShare); return; }
 
   // Get destination filename
-  Path destination;
-  if (mUrl.empty()){
-    destination = "/recalbox/share/system/download.tmp";
-  }else{
-    int nlast = mUrl.FindLast('/');
-    if (nlast == -1){
-      mSender.Send(GenericDownloadingGameState::InvalidUrlFormat); return;
-    }
-    String filename("/recalbox/share/roms/");
-    filename.Append(mSystem.Name());
-    filename.Append("/");
-    filename.Append(mUrl.SubString(nlast+1));
-    destination = filename;
-  }
+  Path destination("/recalbox/share/system/download.tmp");
   { LOG(LogDebug) << "[GenericDownloader] Target path " << destination.ToString(); }
 
-
   // Source URL
-  String source;
-  if (mUrl.empty()){
-    source = sRepoBaseURL;
-    source.Replace("%s", mSystem.Name());
-  }else{
-    source = mUrl;
-  }
+  String source(sRepoBaseURL);
+  source.Replace("%s", mSystem.Name());
 
   // Download
   if (mStopAsap) return;
-  destination.Delete();
+  (void)destination.Delete();
   mTimeReference = DateTime();
   if (!mRequest.Execute(source, destination, this)) { mSender.Send(GenericDownloadingGameState::DownloadError); return; }
-  if (!mUrl.empty()) return;  // finish, if individual download url is specified
 
   // Extract
   { LOG(LogDebug) << "[GenericDownloader] Copying games"; }
@@ -98,7 +66,7 @@ void GenericDownloader::DownloadAndInstall()
     if (relativePath.Filename() == "gamelist.xml") gamelist = zip.Content(i);
     else
     {
-      destinationPath.Directory().CreatePath();
+      (void)destinationPath.Directory().CreatePath();
       if (!destinationPath.Exists())
       {
         String content = zip.Content(i);
@@ -166,10 +134,10 @@ void GenericDownloader::DownloadAndInstall()
   else { LOG(LogError) << "[GenericDownloader] Cannot load remote gamelist!"; }
 
   // Delete temp file
-  destination.Delete();
+  (void)destination.Delete();
 }
 
-void GenericDownloader::DownloadProgress(const Http &http, long long int currentSize, long long int expectedSize)
+void GenericDownloader::DownloadProgress(const HttpClient &http, long long int currentSize, long long int expectedSize)
 {
   (void)http;
   // Store data and synchronize
@@ -232,11 +200,6 @@ void GenericDownloader::ReceiveSyncMessage(const GenericDownloadingGameState &co
     case GenericDownloadingGameState::DownloadError:
     {
       mUpdater.UpdateETAText("Error downloading games! Retry later.");
-      break;
-    }
-    case GenericDownloadingGameState::InvalidUrlFormat:
-    {
-      mUpdater.UpdateETAText("Error downloading games! Invalid URL format.");
       break;
     }
   }

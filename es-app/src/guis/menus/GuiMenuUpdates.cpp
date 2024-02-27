@@ -12,6 +12,7 @@
 #include <guis/MenuMessages.h>
 #include <Upgrade.h>
 #include <guis/GuiUpdateRecalbox.h>
+#include <guis/GuiDownloadFile.h>
 
 GuiMenuUpdates::GuiMenuUpdates(WindowManager& window)
   : GuiMenuBase(window, _("UPDATES"), this)
@@ -31,6 +32,8 @@ GuiMenuUpdates::GuiMenuUpdates(WindowManager& window)
     AddSubMenu(_("START UPDATE"), (int)Components::StartUpdate, _(MENUMESSAGE_START_UPDATE_HELP_MSG));
   }
 
+  AddSubMenu(_("DOWNLOAD FILE"), (int)Components::DownloadFile, _(MENUMESSAGE_START_UPDATE_HELP_MSG));
+
   // Enable updates
   // mType = AddList(_("UPDATE TYPE"), (int)Components::UpdateType, this, GetUpdateTypeEntries(), _(MENUMESSAGE_UPDATE_TYPE_HELP_MSG));
 }
@@ -47,7 +50,7 @@ std::vector<GuiMenuBase::ListEntry<String>> GuiMenuUpdates::GetUpdateTypeEntries
   return list;
 }
 
-void GuiMenuUpdates::SwitchComponentChanged(int id, bool status)
+void GuiMenuUpdates::SwitchComponentChanged(int id, bool& status)
 {
   if ((Components)id == Components::Enable)
     RecalboxConf::Instance().SetUpdatesEnabled(status).Save();
@@ -72,6 +75,13 @@ void GuiMenuUpdates::SubMenuSelected(int id)
   else if ((Components)id == Components::StartUpdate)
   {
     mWindow.pushGui(new GuiUpdateRecalbox(mWindow, Upgrade::TarUrl(), Upgrade::ImageUrl(), Upgrade::HashUrl(), Upgrade::NewVersion()));
+  }
+  else if ((Components)id == Components::DownloadFile)
+  {
+    // mWindow.pushGui(new GuiDownloadFile(mWindow, "https://archive.org/download/snes-romset-ultra-us/Mega%20Man%27s%20Soccer%20%28U%29%20%5B%21%5D.zip","snes"));
+    // mWindow.pushGui(new GuiDownloadFile(mWindow, "https://archive.org/download/nintendo-64-romset-usa/Frogger%202%20%28U%29%20%28Alpha%29%20%5B%21%5D.zip","n64"));
+    // mWindow.pushGui(new GuiDownloadFile(mWindow, "https://archive.org/download/snes-romset-ultra-us/International%20Superstar%20Soccer%20Deluxe%20%28U%29.zip"));
+    mWindow.pushGui(new GuiDownloadFile(mWindow, Files::LoadFile(Path("/recalbox/share/system/rom_link.txt")).Trim(), Files::LoadFile(Path("/recalbox/share/system/rom_system.txt")).Trim()));
   }
 }
 

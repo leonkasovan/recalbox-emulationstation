@@ -80,11 +80,12 @@ class GuiMenuThemeConfiguration : public GuiMenuBase
      * @param id Menu id
      * @return OptionList component
      */
-    OptionList BuildSelector(const String& label, const String& help, const String& selected, const StringMaps& items, Components id, String& original);
+    OptionList BuildSelector(const String& label, const String& help, const String& selected, const String::List& items, Components id, String& original);
+
+    static bool TrySortNumerically(std::vector<ListEntry<String>>& list);
 
     /*
      * IOptionListComponent<String> implementation
      */
 
-    void OptionListComponentChanged(int id, int index, const String& value) override;
-};
+    void OptionListComponentChanged(int id, int index, const String& value) override;};

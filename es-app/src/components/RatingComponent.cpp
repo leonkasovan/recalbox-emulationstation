@@ -10,6 +10,8 @@ RatingComponent::RatingComponent(WindowManager&window, unsigned int color, float
   , mVertices()
   , mColor(color)
   , mOriginColor(color)
+  , mId(0)
+  , mInterface(nullptr)
 {
 	mFilledTexture = TextureResource::get(Path(":/star_filled.svg"), true);
 	mUnfilledTexture = TextureResource::get(Path(":/star_unfilled.svg"), true);

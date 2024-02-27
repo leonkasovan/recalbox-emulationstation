@@ -93,6 +93,6 @@ bool CommandThread::OpenUDP()
 void CommandThread::ReceiveSyncMessage(FileData* const& game)
 {
   ViewController::Instance().WakeUp();
-  ViewController::Instance().Launch(game, GameLinkedData(), Vector3f());
+  ViewController::Instance().Launch(game, GameLinkedData(), Vector3f(), true);
 }
 

@@ -221,9 +221,9 @@ void EditableComponent::onTextChanged()
   bool addAbbrev = false;
   if (!isMultiline)
   {
-    size_t newline = text.find('\n');
+    int newline = text.Find('\n');
     text = text.SubString(0, newline); // single line of text - stop at the first newline since it'll mess everything up
-    addAbbrev = newline != String::npos;
+    addAbbrev = newline >= 0;
   }
 
   Vector2f size = f->sizeText(text);

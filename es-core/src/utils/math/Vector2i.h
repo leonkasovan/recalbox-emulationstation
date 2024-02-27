@@ -52,6 +52,7 @@ class Vector2i
     static Vector2i UnitY() { return { 0, 1 }; }
 
     Vector2f toFloat() const;
+    Vector2i toInt() const;
 
     const int* data() const { return &mX; }
 

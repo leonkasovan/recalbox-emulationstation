@@ -46,7 +46,7 @@ class GuiMenuKodiSettings : public GuiMenuBase
     /*
      * ISwitchComponent implementation
      */
-    void SwitchComponentChanged(int id, bool status) override;
+    void SwitchComponentChanged(int id, bool& status) override;
     void OptionListComponentChanged(int id, int index, const String& value) override;
     std::vector<ListEntry<String>> GetKodiResolutionsEntries();
 

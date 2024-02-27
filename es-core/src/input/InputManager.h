@@ -8,23 +8,23 @@
 #include <utils/os/fs/watching/IFileSystemWatcherNotification.h>
 #include <utils/os/fs/watching/FileNotifier.h>
 #include "IInputChange.h"
+#include <input/InputMapper.h>
 
 class WindowManager;
-class InputMapper;
 
-class InputManager : public IFileSystemWatcherNotification
+class InputManager : public StaticLifeCycleControler<InputManager>
+                   , public IFileSystemWatcherNotification
 {
   public:
+    /*!
+     * @brief Default constructor
+     */
+    InputManager();
+
     /*!
      * @brief Default destructor
      */
     virtual ~InputManager() = default;
-
-    /*!
-     * @brief Instance
-     * @return Singleton instance
-     */
-    static InputManager& Instance();
 
     /*!
      * @brief Initialize the InputManager
@@ -42,6 +42,9 @@ class InputManager : public IFileSystemWatcherNotification
      */
     void Refresh(WindowManager* window, bool padplugged);
 
+    //! Mapper accessor
+    InputMapper& Mapper() { return mMapper; }
+
     /*!
      * Get number of initialized devices
      */
@@ -56,10 +59,10 @@ class InputManager : public IFileSystemWatcherNotification
     InputCompactEvent ManageSDLEvent(WindowManager* window, const SDL_Event& ev);
 
     /*!
-     * @brief Get number of configured devices, either manually or from Xml configuration file
-     * @return Configured device count
+     * @brief Get number of configured controllers, either manually or from Xml configuration file
+     * @return Configured controllers count, not counting the keyboard
      */
-    int ConfiguredDeviceCount();
+    int ConfiguredControllersCount();
 
     /*!
      * @brief Get configuration path
@@ -74,11 +77,18 @@ class InputManager : public IFileSystemWatcherNotification
     static void WriteDeviceXmlConfiguration(InputDevice& device);
 
     /*!
+     * @brief Get device by index
+     * @param index Device index
+     * @return Device configuration
+     */
+    InputDevice& GetDeviceConfigurationFromIndex(int index) { return GetDeviceConfigurationFromId(mIndexToId[index]); }
+
+    /*!
      * @brief Get device by SDL Identifier
      * @param deviceId Device identifier
      * @return Device configuration
      */
-    InputDevice& GetDeviceConfigurationFromIndex(int index) { return GetDeviceConfigurationFromId(mIndexToId[index]); }
+    InputDevice& GetDeviceConfigurationFromId(SDL_JoystickID deviceId);
 
     /*!
      * @brief Generate an ordered device list in function of player devices configuratons
@@ -148,6 +158,13 @@ class InputManager : public IFileSystemWatcherNotification
      */
     String GetDeviceNameFromId(SDL_JoystickID id);
 
+    /*!
+     * @brief Get device name by SDL Identifier
+     * @param deviceId Device identifier
+     * @return Device name
+     */
+    int GetDeviceIndexFromId(SDL_JoystickID id);
+
   private:
     //! Device list
     typedef Array<InputDevice> InputDeviceList;
@@ -171,15 +188,15 @@ class InputManager : public IFileSystemWatcherNotification
     //! Notification interfaces
     Array<IInputChange*> mNotificationInterfaces;
 
+    //! Input mapper (must be initialized after mNotificationInterfaces)
+    InputMapper mMapper;
+
     //! /dev/input watcher
     FileNotifier mFileNotifier;
     //! Joystick change pendings
     bool mJoystickChangePending;
-
-    /*!
-     * @brief Default constructor
-     */
-    InputManager();
+    //! joystick change pending - added or removed?
+    bool mJoystickChangePendingRemoved;
 
     /*!
      * @brief Load default keyboard configuration
@@ -205,7 +222,18 @@ class InputManager : public IFileSystemWatcherNotification
      */
     void ClearAllConfigurations();
 
+    /*!
+     * @brief Build current jostick list
+     * @return Joystick list
+     */
     std::vector<InputDevice> BuildCurrentDeviceList();
+
+    /*!
+     * @brief Remove from both lists, devices that are in both lists, keeping only unique devices in left or right lists
+     * @param left Left list
+     * @param right Right list
+     */
+    static void KeepDifferentPads(std::vector<InputDevice>& left, std::vector<InputDevice>& right);
 
     /*!
      * @brief Load all joystick and load configurations
@@ -247,18 +275,18 @@ class InputManager : public IFileSystemWatcherNotification
     InputCompactEvent ManageKeyEvent(const SDL_KeyboardEvent& key, bool down);
 
     /*!
-     * @brief Process a mousse SDL event and generate an InputCompactEvent accordingly
-     * @param mousse SDL event
+     * @brief Process a mouse SDL event and generate an InputCompactEvent accordingly
+     * @param button SDL event
      * @return InputCompactEvent filled with event information
      */
-    InputCompactEvent ManageMousseButtonEvent(const SDL_MouseButtonEvent& button, bool down);
+    InputCompactEvent ManageMouseButtonEvent(const SDL_MouseButtonEvent& button, bool down);
 
     /*!
-     * @brief Get device by SDL Identifier
-     * @param deviceId Device identifier
-     * @return Device configuration
+     * @brief Process a mouse wheel SDL event and generate an InputCompactEvent accordingly
+     * @param wheel SDL event
+     * @return InputCompactEvent filled with event information
      */
-    InputDevice& GetDeviceConfigurationFromId(SDL_JoystickID deviceId);
+    InputCompactEvent ManageMouseWheelEvent(const SDL_MouseWheelEvent& wheel);
 
     /*
      * IFileSystemWatcherNotification implementation

@@ -143,8 +143,7 @@ bool NetPlayThread::RefreshNetplayList(PlayerGameList& list, bool filtered)
 
       String player = fields["username"].GetString();
       String game   = fields["game_name"].GetString();
-      if ((!filtered) ||
-          (String(fields["frontend"].GetString()).find("@RECALBOX") != String::npos))
+      if (!filtered || (String(fields["frontend"].GetString()).Contains("@RECALBOX")))
         list.push_back(std::make_pair(player, game));
     }
     return true;

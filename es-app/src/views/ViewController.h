@@ -8,9 +8,18 @@
 #include "guis/menus/IFastMenuListCallback.h"
 #include "ISaveStateSlotNotifier.h"
 #include "ISoftPatchingNotifier.h"
+#include "views/gamelist/DetailedGameListView.h"
+#include "guis/GuiWaitLongExecution.h"
 #include <emulators/run/GameLinkedData.h>
 
 class SystemData;
+
+struct DelayedSystemOperationData
+{
+  SystemManager::List mSystemList;
+  ISlowSystemOperation* mSlowIMethodInterface;
+  bool autoSelectMonoSystem;
+};
 
 // Used to smoothly transition the camera between multiple views (e.g. from system to system, from gamelist to gamelist).
 class ViewController : public StaticLifeCycleControler<ViewController>
@@ -20,6 +29,9 @@ class ViewController : public StaticLifeCycleControler<ViewController>
                      , public IFastMenuListCallback
                      , public ISaveStateSlotNotifier
                      , public ISoftPatchingNotifier
+                     , private Thread
+                     , public ISyncMessageReceiver<SlowDataInformation>
+                     , public ILongExecution<DelayedSystemOperationData, bool>
 {
   public:
     //! Flags used in launch method to check what option is already selected
@@ -64,8 +76,9 @@ class ViewController : public StaticLifeCycleControler<ViewController>
      * @param game game to launch
      * @param netplay optional netplay data
      * @param centerCameraOn optional camera target point
+     * @param forceGoToGame Force gamelist & game display after the game end. This is only usefull when a game is not run from its gamelist
      */
-    void Launch(FileData* game, const GameLinkedData& netplay, const Vector3f& centerCameraOn);
+    void Launch(FileData* game, const GameLinkedData& netplay, const Vector3f& centerCameraOn, bool forceGoToGame);
 
     bool GetOrReCreateGamelistView(SystemData* view, bool reloadTheme = false);
     void InvalidateGamelist(const SystemData* system);
@@ -144,6 +157,15 @@ class ViewController : public StaticLifeCycleControler<ViewController>
     //! System must be updated (games have been updated inside)
     void UpdateSystem(SystemData* system) override;
 
+    //! System should be selected
+    void SelectSystem(SystemData* system) override;
+
+    //! Request threaded operations
+    void RequestSlowOperation(ISlowSystemOperation* interface, ISlowSystemOperation::List systems, bool autoSelectMonoSystem) override;
+
+    //! User notification
+    void SystemShownWithNoGames(SystemData* system) override;
+
     /*
      * Component override
      */
@@ -151,6 +173,17 @@ class ViewController : public StaticLifeCycleControler<ViewController>
     bool ProcessInput(const InputCompactEvent& event) override;
     void Update(int deltaTime) override;
     void Render(const Transform4x4f& parentTrans) override;
+
+    void FetchSlowDataFor(FileData* data);
+
+    /*
+     * ILongExecution implementation
+     */
+
+    bool Execute(GuiWaitLongExecution<DelayedSystemOperationData, bool>& from,
+                 const DelayedSystemOperationData& parameter) override;
+
+    void Completed(const DelayedSystemOperationData& parameter, const bool& result) override;
 
   private:
     //! Fast menu types
@@ -170,6 +203,8 @@ class ViewController : public StaticLifeCycleControler<ViewController>
     Vector3f mLaunchCameraTarget;
     //! Check flags
     LaunchCheckFlags mCheckFlags;
+    //! Force go to game after the game ends
+    bool mForceGoToGame;
 
     //! SystemManager instance
     SystemManager& mSystemManager;
@@ -194,6 +229,9 @@ class ViewController : public StaticLifeCycleControler<ViewController>
     float mFadeOpacity;
     bool mLockInput;
 
+    //! Last launch time
+    DateTime mLastGameLaunched;
+
     //! Keep choice of frequency (megadrive multi-60)
     int mFrequencyLastChoiceMulti60;
     //! Keep choice of frequency (all systems, except megadrive)
@@ -204,6 +242,17 @@ class ViewController : public StaticLifeCycleControler<ViewController>
     int mSuperGameboyLastChoice;
     //! Keep choice of Soft patching
     int mSoftPatchingLastChoice;
+
+    //! Item information synchronizer
+    SyncMessageSender<SlowDataInformation> mSender;
+    //! Next item to fetch slow data from
+    FileData* mNextItem;
+    //! Last slow data extracted: folder images' path
+    FolderImagesPath mLastFolderImagePath;
+    //! Locker
+    Mutex mLocker;
+    //! Fetch info thread signal
+    Signal mSignal;
 
     /*!
      * @brief  Check if softpatching is required and let the user select
@@ -252,8 +301,6 @@ class ViewController : public StaticLifeCycleControler<ViewController>
 
     void playViewTransition();
 
-    int getSystemId(SystemData* system);
-
     /*
      * IFastMenuLineCallback implementation
      */
@@ -289,6 +336,23 @@ class ViewController : public StaticLifeCycleControler<ViewController>
      * @param path Selected patch's path
      */
     void SoftPatchingSelected(const Path& path) override;
+
+    /*
+     * Thread implementation
+     */
+
+    //! Break the system info fetching thread
+    void Break() override { mSignal.Fire(); }
+
+    //! Implementation of system fetching info
+    void Run() override;
+
+    /*
+     * ISyncMessageReceiver<const FileData*> implementation
+     */
+
+    //! Receive enf-of-fetch info for the very last system the user is on
+    void ReceiveSyncMessage(const SlowDataInformation& data) override;
 };
 
 DEFINE_BITFLAG_ENUM(ViewController::LaunchCheckFlags, int)

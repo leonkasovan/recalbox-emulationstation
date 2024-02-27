@@ -47,5 +47,9 @@ class Gui : public Component
      */
     [[nodiscard]] virtual bool MustRenderOverHelpSystem() const { return false; }
 
+    /*!
+     * @brief Allow a gui to tell the system not to interrupt by popupwindows
+     * @return True of the windows does not want to be interrupted, false otherwise
+     */
     [[nodiscard]] virtual bool DoNotDisturb() const { return false; }
 };

@@ -10,15 +10,15 @@
 
 BiosManager::BiosManager()
   : StaticLifeCycleControler<BiosManager>("BiosManager")
-  #ifndef PURE_BIOS_ONLY
   , mSender(*this)
-  #endif
   , mReporting(nullptr)
+  , mLocker(*new Mutex())
 {
 }
 
 void BiosManager::LoadFromFile()
 {
+  Mutex::AutoLock locker(mLocker);
   Path xmlpath = RootFolders::TemplateRootFolder / sBiosFilePath;
 
   XmlDocument biosListXml;
@@ -41,6 +41,7 @@ void BiosManager::LoadFromFile()
 
 void BiosManager::Scan(IBiosScanReporting* reporting, bool sync)
 {
+  Mutex::AutoLock locker(mLocker);
   if (sync)
   {
     mReporting = reporting;
@@ -55,6 +56,7 @@ void BiosManager::Scan(IBiosScanReporting* reporting, bool sync)
 
 void BiosManager::Run()
 {
+  Mutex::AutoLock locker(mLocker);
   // Scan
   for(int l = 0; l < SystemCount(); ++l)
   {
@@ -63,16 +65,12 @@ void BiosManager::Run()
     {
       if (!IsRunning()) return;
       biosList.ScanAt(i);
-      #ifndef PURE_BIOS_ONLY
-        mSender.Send(BiosMessage::SingleBiosReport(mReporting, l, i));
-      #endif
+      mSender.Send(BiosMessage::SingleBiosReport(mReporting, l, i));
     }
   }
 
   // End of scan
-  #ifndef PURE_BIOS_ONLY
-    mSender.Send(BiosMessage::EndBiosReport(mReporting));
-  #endif
+  mSender.Send(BiosMessage::EndBiosReport(mReporting));
 
   // Nullify interface
   mReporting = nullptr;
@@ -82,7 +80,6 @@ void BiosManager::Run()
     GenerateReport();
 }
 
-#ifndef PURE_BIOS_ONLY
 void BiosManager::ReceiveSyncMessage(const BiosMessage& message)
 {
   // Extract interface
@@ -90,6 +87,7 @@ void BiosManager::ReceiveSyncMessage(const BiosMessage& message)
 
   if (message.mComplete)
   {
+    Mutex::AutoLock locker(mLocker);
     if (reporting != nullptr)
       reporting->ScanComplete();
     // Allow the thread to be restarted
@@ -97,15 +95,16 @@ void BiosManager::ReceiveSyncMessage(const BiosMessage& message)
   }
   else
   {
+    Mutex::AutoLock locker(mLocker);
     // Call interface
     if (reporting != nullptr)
       reporting->ScanProgress(SystemBios(message.mListIndex).BiosAt(message.mIndex));
   }
 }
-#endif
 
 const BiosList& BiosManager::SystemBios(const String& name) const
 {
+  Mutex::AutoLock locker(mLocker);
   for(const BiosList& biosList : mSystemBiosList)
     if (biosList.Name() == name)
       return biosList;
@@ -114,8 +113,41 @@ const BiosList& BiosManager::SystemBios(const String& name) const
   return sEmptyBiosList;
 }
 
+BiosManager::LookupResult BiosManager::Lookup(const std::string& name, const std::string& md5, const Bios*& outputBios) const
+{
+  Mutex::AutoLock locker(mLocker);
+  outputBios = nullptr;
+
+  // MD5 first
+  for(const BiosList& biosList : mSystemBiosList)
+    for(int i = biosList.BiosCount(); --i >= 0; )
+    {
+      const Bios& bios = biosList.BiosAt(i);
+      if (bios.IsMD5Known(md5))
+      {
+        outputBios = &bios;
+        return (bios.BiosStatus() == Bios::Status::HashMatching) ? LookupResult::AlreadyExists : LookupResult::Found;
+      }
+    }
+
+  // Name & no matching mandatory
+  for(const BiosList& biosList : mSystemBiosList)
+    for(int i = biosList.BiosCount(); --i >= 0; )
+    {
+      const Bios& bios = biosList.BiosAt(i);
+      if (name == bios.Filepath().Filename() && !bios.IsHashMatchingMandatory())
+      {
+        outputBios = &bios;
+        return LookupResult::Found;
+      }
+    }
+
+  return LookupResult::NotFound;
+}
+
 void BiosManager::GenerateReport() const
 {
+  Mutex::AutoLock locker(mLocker);
   String report = "==============================================================\r\n"
                        "MISSING BIOS REPORT\r\n"
                        "Platform: #ARCH#\r\n"
@@ -132,5 +164,19 @@ void BiosManager::GenerateReport() const
   }
 
   Files::SaveFile(RootFolders::DataRootFolder / sReportPath, report);
+}
+
+bool BiosManager::Moved() const
+{
+  for(const BiosList& biosList : mSystemBiosList)
+    if (biosList.MoveStatus()) return true;
+  return false;
+}
+
+bool BiosManager::MoveError() const
+{
+  for(const BiosList& biosList : mSystemBiosList)
+    if (biosList.MoveErrorStatus()) return true;
+  return false;
 }
 

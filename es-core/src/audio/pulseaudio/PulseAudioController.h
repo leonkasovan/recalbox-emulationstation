@@ -409,4 +409,8 @@ class PulseAudioController: public IAudioController
      */
     void ClearNotificationCallback() override { mNotificationInterface = nullptr; }
 
+    /*!
+     * @brief Set output port name of the current sink
+     */
+    void SetOutputPort(const String portName);
 };

@@ -4222,6 +4222,9 @@ PUGI__NS_BEGIN
 				writer.write('>');
 				break;
 
+      case node_element:
+      case node_document:
+      case node_null:
 			default:
 				assert(false && "Invalid node type"); // unreachable
 		}
@@ -6331,6 +6334,7 @@ namespace pugi
 		case node_doctype:
 			return _root->value && (_root->header & impl::xml_memory_page_value_allocated_or_shared_mask) == 0 ? _root->value - doc.buffer : -1;
 
+    case node_null:
 		default:
 			assert(false && "Invalid node type"); // unreachable
 			return -1;
@@ -7942,9 +7946,12 @@ PUGI__NS_BEGIN
 				return result;
 			}
 
+      case node_null:
+      case node_declaration:
+      case node_doctype:
 			default:
 				return xpath_string();
-			}
+      }
 		}
 	}
 
@@ -8665,6 +8672,7 @@ PUGI__NS_BEGIN
 		case xpath_type_boolean:
 			return new_xpath_variable<xpath_variable_boolean>(name);
 
+    case xpath_type_none:
 		default:
 			return 0;
 		}
@@ -8696,6 +8704,7 @@ PUGI__NS_BEGIN
 			delete_xpath_variable(static_cast<xpath_variable_boolean*>(var));
 			break;
 
+      case xpath_type_none:
 		default:
 			assert(false && "Invalid variable type"); // unreachable
 		}
@@ -8717,6 +8726,7 @@ PUGI__NS_BEGIN
 		case xpath_type_boolean:
 			return lhs->set(static_cast<const xpath_variable_boolean*>(rhs)->value);
 
+    case xpath_type_none:
 		default:
 			assert(false && "Invalid variable type"); // unreachable
 			return false;
@@ -10052,6 +10062,7 @@ PUGI__NS_BEGIN
 				break;
 			}
 
+      case axis_namespace:
 			default:
 				assert(false && "Unimplemented axis"); // unreachable
 			}
@@ -10133,6 +10144,12 @@ PUGI__NS_BEGIN
 				break;
 			}
 
+      case axis_child:
+      case axis_attribute:
+      case axis_descendant:
+      case axis_preceding_sibling:
+      case axis_following_sibling:
+      case axis_namespace:
 			default:
 				assert(false && "Unimplemented axis"); // unreachable
 			}
@@ -11467,9 +11484,31 @@ PUGI__NS_BEGIN
 				return parse_function(function, argc, args);
 			}
 
+      case lex_none:
+      case lex_equal:
+      case lex_not_equal:
+      case lex_less:
+      case lex_greater:
+      case lex_less_or_equal:
+      case lex_greater_or_equal:
+      case lex_plus:
+      case lex_minus:
+      case lex_multiply:
+      case lex_union:
+      case lex_close_brace:
+      case lex_slash:
+      case lex_double_slash:
+      case lex_open_square_brace:
+      case lex_close_square_brace:
+      case lex_comma:
+      case lex_axis_attribute:
+      case lex_dot:
+      case lex_double_dot:
+      case lex_double_colon:
+      case lex_eof:
 			default:
 				return error("Unrecognizable primary expression");
-			}
+      }
 		}
 
 		// FilterExpr ::= PrimaryExpr | FilterExpr Predicate
@@ -11867,9 +11906,25 @@ PUGI__NS_BEGIN
 				case lex_union:
 					return binary_op_t(ast_op_union, xpath_type_node_set, 7);
 
+        case lex_none:
+        case lex_var_ref:
+        case lex_open_brace:
+        case lex_close_brace:
+        case lex_quoted_string:
+        case lex_number:
+        case lex_slash:
+        case lex_double_slash:
+        case lex_open_square_brace:
+        case lex_close_square_brace:
+        case lex_comma:
+        case lex_axis_attribute:
+        case lex_dot:
+        case lex_double_dot:
+        case lex_double_colon:
+        case lex_eof:
 				default:
 					return binary_op_t();
-				}
+        }
 			}
 		};
 
@@ -12257,6 +12312,7 @@ namespace pugi
 		case xpath_type_boolean:
 			return static_cast<const impl::xpath_variable_boolean*>(this)->name;
 
+    case xpath_type_none:
 		default:
 			assert(false && "Invalid variable type"); // unreachable
 			return 0;

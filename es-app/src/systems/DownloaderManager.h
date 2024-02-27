@@ -21,7 +21,6 @@ class DownloaderManager
     static bool HasDownloader(const SystemData& system);
 
     BaseSystemDownloader* CreateOrGetDownloader(SystemData& system, IGuiDownloaderUpdater& updater);
-    BaseSystemDownloader* CreateOrGetDownloader(SystemData& system, String url, IGuiDownloaderUpdater& updater);
 
   private:
     //! Hold downloader per system

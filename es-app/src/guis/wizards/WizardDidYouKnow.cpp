@@ -4,7 +4,7 @@
 
 #include "WizardDidYouKnow.h"
 
-Wizard::Move WizardDidYouKnow::OnKeyReceived(int page, const InputCompactEvent& event)
+SimpleWizardBase::Move WizardDidYouKnow::OnKeyReceived(int page, const InputCompactEvent& event)
 {
   // A = backward on all pages but the first
   if (event.AReleased() && page > 0) return Move::Backward;

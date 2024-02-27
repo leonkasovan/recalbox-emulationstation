@@ -518,7 +518,7 @@ String GuiNetPlay::GetFormattedName(const LobbyGame& game)
   // Get game name
   String gameName = game.mGameName;
   static String arcadesCores("FinalBurn Neo,MAME 2000,MAME 2003,MAME 2003-Plus,MAME 2010,MAME 2015,MAME 2016");
-  if (arcadesCores.find(gameName) != String::npos && game.mGame != nullptr)
+  if (arcadesCores.Find(gameName) >= 0 && game.mGame != nullptr)
     gameName = GameNameMapManager::Rename(game.mGame->System(), game.mGameName);
 
   // Add decorations

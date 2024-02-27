@@ -26,6 +26,8 @@
 #include "DemoMode.h"
 #include "RotationManager.h"
 #include "RootFolders.h"
+#include "web/RestApiServer.h"
+#include "guis/wizards/WizardLite.h"
 #include <utils/network/DnsClient.h>
 #include <music/RemotePlaylist.h>
 #include <hardware/devices/storage/StorageDevices.h>
@@ -49,6 +51,7 @@ MainRunner::MainRunner(const String& executablePath, unsigned int width, unsigne
   , mNotificationManager(environment)
   , mApplicationWindow(nullptr)
   , mBluetooth()
+  , mBTAutopairManager()
 {
   Intro(debug, trace);
   SetLocale(executablePath);
@@ -88,18 +91,39 @@ MainRunner::ExitState MainRunner::Run()
     // Shut-up joysticks :)
     SDL_JoystickEventState(SDL_DISABLE);
 
+    SystemManager systemManager(*this, mIgnoredFiles);
+    GameRunner gameRunner(nullptr, systemManager, *this);
+    FileNotifier fileNotifier;
+    InputManager inputManager;
+    inputManager.Initialize();
+
+    // Autorun?
+    if (mRunCount == 0) {
+      if (mConfiguration.GetKodiEnabled() && mConfiguration.GetKodiAtStartup())
+        gameRunner.RunKodi();
+      if (RecalboxConf::Instance().GetAutorunEnabled() && !RecalboxConf::Instance().GetAutorunGamePath().empty())
+      {
+        systemManager.LoadSingleSystemConfigurations(RecalboxConf::Instance().GetAutorunSystemUUID());
+        ResetForceReloadState();
+        FileData *game = systemManager.LookupGameByFilePath(RecalboxConf::Instance().GetAutorunGamePath());
+        if (game != nullptr && inputManager.ConfiguredControllersCount() > 0)
+          gameRunner.RunGame(*game, EmulatorManager::GetGameEmulator(*game), GameLinkedData());
+        else
+          { LOG(LogInfo) << "[MainRunner] Will not boot on game as game = null or no configured controllers found"; }
+      }
+    }
+
     // Initialize the renderer first,'cause many things depend on renderer width/height
     Renderer renderer((int)mRequestedWidth, (int)mRequestedHeight, mRequestWindowed,
                       RotationManager::GetSystemRotation());
     if (!renderer.Initialized()) { LOG(LogError) << "[Renderer] Error initializing the GL renderer."; return ExitState::FatalError; }
 
     // Initialize main Window and ViewController
-    SystemManager systemManager(*this, mIgnoredFiles);
     ApplicationWindow window(systemManager);
     if (!window.Initialize(mRequestedWidth, mRequestedHeight, false)) { LOG(LogError) << "[Renderer] Window failed to initialize!"; return ExitState::FatalError; }
-    InputManager::Instance().Initialize();
     mApplicationWindow = &window;
-    mBluetooth.Register(&window.BluetoothNotifier());
+    gameRunner.SetWindowManager(&window);
+    mBluetooth.Register(&window.OSD().GetBluetoothOSD());
     // Brightness
     if (board.HasBrightnessSupport())
       board.SetBrightness(RecalboxConf::Instance().GetBrightness());
@@ -115,8 +139,6 @@ MainRunner::ExitState MainRunner::Run()
     window.RenderAll();
     PlayLoadingSound(audioManager);
 
-    // Try to load system configurations
-    FileNotifier fileNotifier;
     if (!TryToLoadConfiguredSystems(systemManager, fileNotifier, sForceReloadFromDisk))
       return ExitState::FatalError;
     ResetForceReloadState();
@@ -127,17 +149,20 @@ MainRunner::ExitState MainRunner::Run()
     ExitState exitState = ExitState::Quit;
     try
     {
+      // Bios (must be created before the webmanager starts)
+      BiosManager biosManager;
+      biosManager.LoadFromFile();
+      biosManager.Scan(nullptr);
+
+      // Start webserver
+      { LOG(LogDebug) << "[MainRunner] Launching Webserver"; }
+      RestApiServer webManager(systemManager);
+
       // Patron Information
       PatronInfo patronInfo(this);
       // Remote music
       RemotePlaylist remotePlaylist;
 
-      // Run kodi at startup?
-      GameRunner gameRunner(window, systemManager, *this);
-      //if (RecalboxSystem::kodiExists())
-      if ((mRunCount == 0) && mConfiguration.GetKodiEnabled() && mConfiguration.GetKodiAtStartup())
-        gameRunner.RunKodi();
-      
       // Start update thread
       { LOG(LogDebug) << "[MainRunner] Launching Network thread"; }
       Upgrade networkThread(window);
@@ -166,15 +191,14 @@ MainRunner::ExitState MainRunner::Run()
       // Alert
       CheckAlert(window, systemManager);
 
-      // Bios
-      BiosManager biosManager;
-      biosManager.LoadFromFile();
-      biosManager.Scan(nullptr);
+      // Enable joystick autopairing
+      if(RecalboxConf::Instance().GetAutoPairOnBoot())
+        mBTAutopairManager.StartDiscovery();
 
       // Main Loop!
       CreateReadyFlagFile();
       Path externalNotificationFolder = Path(sQuitNow).Directory();
-      externalNotificationFolder.CreatePath();
+      (void)externalNotificationFolder.CreatePath();
       fileNotifier.WatchFile(externalNotificationFolder)
                   .SetEventNotifier(EventType::CloseWrite | EventType::Remove | EventType::Create, this);
 
@@ -204,23 +228,27 @@ MainRunner::ExitState MainRunner::Run()
     switch(exitState)
     {
       case ExitState::Quit:
-      case ExitState::FatalError: NotificationManager::Instance().Notify(Notification::Quit, exitState == ExitState::FatalError ? "fatalerror" : "quitrequested"); break;
+      case ExitState::FatalError: mNotificationManager.Notify(Notification::Quit, exitState == ExitState::FatalError ? "fatalerror" : "quitrequested"); break;
       case ExitState::Relaunch:
-      case ExitState::RelaunchNoUpdate: NotificationManager::Instance().Notify(Notification::Relaunch); break;
+      case ExitState::RelaunchNoUpdate: mNotificationManager.Notify(Notification::Relaunch); break;
       case ExitState::NormalReboot:
       case ExitState::FastReboot:
       {
-        NotificationManager::Instance().Notify(Notification::Reboot, exitState == ExitState::FastReboot ? "fast" : "normal");
+        mNotificationManager.Notify(Notification::Reboot, exitState == ExitState::FastReboot ? "fast" : "normal");
         board.OnRebootOrShutdown();
         break;
       }
       case ExitState::Shutdown:
       case ExitState::FastShutdown: {
-        NotificationManager::Instance().Notify(Notification::Shutdown, exitState == ExitState::FastShutdown ? "fast" : "normal");
+        mNotificationManager.Notify(Notification::Shutdown, exitState == ExitState::FastShutdown ? "fast" : "normal");
         board.OnRebootOrShutdown();
         break;
       }
     }
+
+    // Wait for all notifications to be processed before
+    // main objects are destroyed
+    mNotificationManager.WaitCompletion();
 
     return exitState;
   }
@@ -245,7 +273,7 @@ void MainRunner::CreateReadyFlagFile()
 void MainRunner::DeleteReadyFlagFile()
 {
   Path ready(sReadyFile);
-  ready.Delete();
+  (void)ready.Delete();
 }
 
 MainRunner::ExitState MainRunner::MainLoop(ApplicationWindow& window, SystemManager& systemManager, FileNotifier& fileNotifier, SyncMessageFactory& syncMessageFactory)
@@ -290,15 +318,23 @@ MainRunner::ExitState MainRunner::MainLoop(ApplicationWindow& window, SystemMana
         //case SDL_JOYDEVICEREMOVED:
         case SDL_MOUSEBUTTONDOWN:
         case SDL_MOUSEBUTTONUP:
+        case SDL_MOUSEWHEEL:
         {
           // Convert event
-          //{ LOG(LogInfo) << "[MainRunner] Event in Loop event."; }
-          InputCompactEvent compactEvent = InputManager::Instance().ManageSDLEvent(&window, event);
-          // TODO: invert those lines, special events should be managed by the board in priority
-          if (!ProcessSpecialInputs(compactEvent))
-            if (!Board::Instance().ProcessSpecialInputs(compactEvent, this))
-              if (!compactEvent.Empty())
-                window.ProcessInput(compactEvent);
+          for(;;)
+          {
+            //{ LOG(LogInfo) << "[MainRunner] Event in Loop event."; }
+            InputCompactEvent compactEvent = InputManager::Instance().ManageSDLEvent(&window, event);
+            // TODO: invert those lines, special events should be managed by the board in priority
+            if (!ProcessSpecialInputs(compactEvent))
+              if (!Board::Instance().ProcessSpecialInputs(compactEvent, this))
+                if (!compactEvent.Empty())
+                  window.ProcessInput(compactEvent);
+            // Mouse Wheel event must resend a null move
+            if (event.type == SDL_MOUSEWHEEL)
+              if ((int)event.wheel.which >= 0) { event.wheel.which = -1; continue; }
+            break;
+          }
           // Quit?
           if (window.Closed()) RequestQuit(ExitState::Quit);
           break;
@@ -358,12 +394,9 @@ MainRunner::ExitState MainRunner::MainLoop(ApplicationWindow& window, SystemMana
 
 void MainRunner::InitializeUserInterface(WindowManager& window)
 {
-  // Choose which GUI to open depending on if an input configuration already exists
+  (void)window;
   { LOG(LogDebug) << "[MainRunner] Preparing GUI"; }
-  if (InputManager::ConfigurationPath().Exists() && InputManager::Instance().ConfiguredDeviceCount() > 0)
-    ViewController::Instance().goToStart();
-  else
-    window.pushGui(new GuiDetectDevice(window, true, [] { ViewController::Instance().goToStart(); }));
+  ViewController::Instance().goToStart();
 }
 
 void MainRunner::CheckAlert(WindowManager& window, SystemManager& systemManager)
@@ -374,7 +407,7 @@ void MainRunner::CheckAlert(WindowManager& window, SystemManager& systemManager)
   if (memory != 0 && memory <= 512)
   {
     int realSystemCount = 0;
-    for(const SystemData* system : systemManager.AllSystems())
+    for(const SystemData* system : systemManager.VisibleSystemList())
       if (system->HasVisibleGame())
         realSystemCount++;
     if (realSystemCount > maxSystem)
@@ -392,6 +425,12 @@ void MainRunner::CheckAlert(WindowManager& window, SystemManager& systemManager)
       window.pushGui(new GuiMsgBoxScroll(window, _("WARNING! SYSTEM OVERLOAD!"), text, _("OK"), nullptr, "", nullptr, "", nullptr, TextAlignment::Left));
     }
   }
+}
+
+void MainRunner::CheckRecalboxLite(WindowManager& window)
+{
+  if (RecalboxSystem::IsLiteVersion())
+    window.pushGui(new WizardLite(window));
 }
 
 void MainRunner::CheckFirstTimeWizard(WindowManager& window)
@@ -418,6 +457,8 @@ void MainRunner::CheckFirstTimeWizard(WindowManager& window)
         window.pushGui(new WizardRG353X(window));
         return; // Let the RG Wizard reset the flag
       }
+      case BoardType::RG351V: // todo
+      case BoardType::RG351P: // todo
       case BoardType::PCx86:
       case BoardType::PCx64:
       case BoardType::UndetectedYet:
@@ -429,14 +470,15 @@ void MainRunner::CheckFirstTimeWizard(WindowManager& window)
       case BoardType::Pi3:
       case BoardType::Pi4:
       case BoardType::Pi400:
+      case BoardType::Pi5:
       case BoardType::Pi3plus:
       case BoardType::UnknownPi:
-      default: break;
+      default:
+      {
+        CheckRecalboxLite(window);
+        break;
+      }
     }
-    // start autopair process
-    MqttClient mqtt("recalbox-emulationstation-bt", nullptr);
-    mqtt.Wait();
-    mqtt.Send("bluetooth/operation", R"({"command": "start_discovery"})");
     RecalboxConf::Instance().SetFirstTimeUse(false);
   }
 }
@@ -450,7 +492,7 @@ void MainRunner::CheckUpdateMessage(WindowManager& window)
     String changelog = Files::LoadFile(Path(Upgrade::sLocalReleaseNoteFile));
     String message = "Changes :\n" + changelog;
     window.pushGui(new GuiMsgBoxScroll(window, _("THE SYSTEM IS UP TO DATE"), message, _("OK"), []{}, "", nullptr, "", nullptr, TextAlignment::Left));
-    flag.Delete();
+    (void)flag.Delete();
   }
 }
 
@@ -464,7 +506,7 @@ void MainRunner::CheckUpdateFailed(WindowManager& window)
     String message = _("The upgrade process has failed. You are back on Recalbox %s.\nPlease retry to upgrade your Recalbox, and contact the team on https://forum.recalbox.com if the problem persists.")
                      .Replace("%s", version.c_str());
     window.pushGui(new GuiMsgBoxScroll(window, _("THE UPGRADE HAS FAILED"), message, _("OK"), []{}, "", nullptr, "", nullptr, TextAlignment::Left));
-    flag.Delete();
+    (void)flag.Delete();
   }
 }
 
@@ -478,7 +520,7 @@ void MainRunner::CheckUpdateCorrupted(WindowManager& window)
     String message = _("One or more files are corrupted. You are back on Recalbox %s.\nPlease retry to upgrade your Recalbox, check your Recalbox storage (SD Card, USB Key or hard drive).\nContact the team on https://forum.recalbox.com if the problem persists.")
                      .Replace("%s", version.c_str());
     window.pushGui(new GuiMsgBoxScroll(window, _("THE UPGRADE IS CORRUPTED"), message, _("OK"), []{}, "", nullptr, "", nullptr, TextAlignment::Left));
-    flag.Delete();
+    (void)flag.Delete();
   }
 }
 
@@ -496,10 +538,16 @@ void MainRunner::PlayLoadingSound(AudioManager& audioManager)
 
 bool MainRunner::TryToLoadConfiguredSystems(SystemManager& systemManager, FileNotifier& gamelistWatcher, bool forceReloadFromDisk)
 {
-  IniFile recalboxBootConf(Path("/boot/recalbox-boot.conf"), false);
+  IniFile recalboxBootConf(Path("/boot/recalbox-boot.conf"), false, false);
   bool portable = recalboxBootConf.AsString("case") == "GPiV1:1";
   switch(Board::Instance().GetBoardType())
   {
+    case BoardType::RG351V:
+    case BoardType::RG351P:
+    case BoardType::RG353P:
+    case BoardType::RG353V:
+    case BoardType::RG353M:
+    case BoardType::RG503:
     case BoardType::OdroidAdvanceGo:
     case BoardType::OdroidAdvanceGoSuper: portable = true; break;
     case BoardType::UndetectedYet:
@@ -512,13 +560,10 @@ bool MainRunner::TryToLoadConfiguredSystems(SystemManager& systemManager, FileNo
     case BoardType::Pi3plus:
     case BoardType::Pi4:
     case BoardType::Pi400:
+    case BoardType::Pi5:
     case BoardType::UnknownPi:
     case BoardType::PCx86:
     case BoardType::PCx64:
-    case BoardType::RG353P:
-    case BoardType::RG353V:
-    case BoardType::RG353M:
-    case BoardType::RG503:
     default: break;
   }
 
@@ -621,8 +666,7 @@ void MainRunner::CheckHomeFolder()
   if (!configDir.Exists())
   {
     { LOG(LogError) << "[MainRunner] Creating config directory \"" << configDir.ToString() << "\"\n"; }
-    configDir.CreatePath();
-    if (!configDir.Exists()) { LOG(LogError) << "[MainRunner] Config directory could not be created!\n"; }
+    if (!configDir.CreatePath()) { LOG(LogError) << "[MainRunner] Config directory could not be created!\n"; }
   }
 }
 
@@ -682,7 +726,7 @@ void MainRunner::FileSystemWatcherNotification(EventType event, const Path& path
       String name = path.Filename();
       if (name == "gamelist.xml" || name == "gamelist.zip")
         mPendingExit = PendingExit::GamelistChanged;
-      else if (path.ToString().find("themes") != String::npos)
+      else if (path.ToString().Find("themes") >= 0)
         mPendingExit = PendingExit::ThemeChanged;
     }
   }
@@ -718,6 +762,55 @@ void MainRunner::ResetButtonPressed(BoardType board)
     { LOG(LogDebug) << "[MainRunner] Reset Button Pressed in game : exiting subprocesses"; }
     ProcessTree::TerminateAll(1000);
   }
+}
+
+void MainRunner::UnderVoltage(BoardType board)
+{
+  (void)board;
+  { LOG(LogInfo) << "[MainRunner] Undervoltage popup."; }
+  String message = _("An undervoltage has been detected, the system may slow down.\n");
+  String suffix;
+  switch(board)
+  {
+    case(BoardType::Pi400): suffix = " 400."; break;
+    case(BoardType::Pi5): suffix = " 5."; break;
+    case(BoardType::Pi4): suffix = " 4."; break;
+    case BoardType::UndetectedYet:
+    case BoardType::Unknown:
+    case BoardType::Pi0:
+    case BoardType::Pi02:
+    case BoardType::Pi1:
+    case BoardType::Pi2:
+    case BoardType::Pi3:
+    case BoardType::Pi3plus:
+    case BoardType::UnknownPi:
+    case BoardType::OdroidAdvanceGo:
+    case BoardType::OdroidAdvanceGoSuper:
+    case BoardType::RG351V:
+    case BoardType::RG351P:
+    case BoardType::RG353P:
+    case BoardType::RG353V:
+    case BoardType::RG353M:
+    case BoardType::RG503:
+    case BoardType::PCx86:
+    case BoardType::PCx64:
+    default: suffix = "."; break;
+
+  }
+  if(Board::Instance().CrtBoard().GetCrtAdapter() == CrtAdapterType::RGBJamma)
+    message.Append(_("We recommend adjusting your JAMMA cabinet power supply to increase the voltage to between 5.05V and 5.2V"));
+  else if (BoardTypeUtil::IsRaspberryPi(Board::Instance().GetBoardType()))
+    message.Append(_("We recommend that you purchase an official USB-C power supply designed for your Raspberry Pi").Append(suffix));
+
+  mApplicationWindow->InfoPopupAdd(new GuiInfoPopup(*mApplicationWindow, message, 15, PopupType::Warning));
+}
+
+void MainRunner::TemperatureAlert(BoardType board)
+{
+  (void)board;
+  { LOG(LogInfo) << "[MainRunner] Temperature popup."; }
+  String message = _("The temperature of your system is high.\nThe system may slow down. Try cooling your Raspberry Pi with a fan or disable overclock if it's enabled.");
+  mApplicationWindow->InfoPopupAdd(new GuiInfoPopup(*mApplicationWindow, message, 15, PopupType::Warning));
 }
 
 void MainRunner::PowerButtonPressed(BoardType board, int milliseconds)
@@ -1059,7 +1152,8 @@ bool MainRunner::ProcessSpecialInputs(const InputCompactEvent& event)
   // TODO: Must be cleaned after 8.1
   const BoardType board = Board::Instance().GetBoardType();
   if (board == BoardType::OdroidAdvanceGo || board == BoardType::OdroidAdvanceGoSuper || board == BoardType::Pi400 ||
-      board == BoardType::RG353P || board == BoardType::RG353V || board == BoardType::RG353M || board == BoardType::RG503)
+      board == BoardType::RG353P || board == BoardType::RG353V || board == BoardType::RG353M || board == BoardType::RG503 ||
+      board == BoardType::RG351V || board == BoardType::RG351P)
     return false;
   const InputEvent& raw = event.RawEvent();
   if (raw.Type() == InputEvent::EventType::Key)
@@ -1071,4 +1165,16 @@ bool MainRunner::ProcessSpecialInputs(const InputCompactEvent& event)
         default: break;
       }
   return false;
+}
+
+void MainRunner::ScanComplete()
+{
+  BiosManager& manager = BiosManager::Instance();
+  WindowManager& window = *mApplicationWindow;
+  if (manager.Moved() && !manager.MoveError())
+    window.displayMessage(_("With regard to the new BIOS folder structure, some of your bios files have been moved automatically to their new path.").Append("\n\n").Append(_("This move is applied only once. No additional operation required.")));
+  else if (manager.Moved() && manager.MoveError())
+    window.displayMessage(_("With regard to the new BIOS folder structure, some of your bios files have been moved automatically to their new path.").Append("\n\n").Append(_("However, some files failed to move. You should run the BIOS Checker and move some files manually.")));
+  else if (manager.MoveError())
+    window.displayMessage(_("With regard to the new BIOS folder structure, some of your bios files have been moved automatically to their new path.").Append("\n\n").Append(_("However, all files failed to move. You should:\n- either run the BIOS Checker and move the required files manually.\n- or if your bios files are on a read-only device or remote share, change it to read-write, reboot your recalbox, wait until all files are moved, then protect it again.")));
 }

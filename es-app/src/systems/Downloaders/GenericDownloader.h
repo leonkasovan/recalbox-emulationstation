@@ -5,7 +5,7 @@
 
 #include "guis/IGuiDownloaderUpdater.h"
 #include "systems/BaseSystemDownloader.h"
-#include "utils/network/Http.h"
+#include "utils/network/HttpClient.h"
 
 enum class GenericDownloadingGameState
 {
@@ -17,16 +17,14 @@ enum class GenericDownloadingGameState
     // Errors
     WriteOnlyShare,    //!< Share is write only!
     DownloadError,     //!< Error downloading file(s)
-    InvalidUrlFormat   //!< Invalid Url Format. Has to be https://..../filename.ext
 };
 
 class GenericDownloader : public BaseSystemDownloader
                         , private ISyncMessageReceiver<GenericDownloadingGameState>
-                        , private Http::IDownload
+                        , private HttpClient::IDownload
 {
   public:
     GenericDownloader(SystemData& system, IGuiDownloaderUpdater& updater);
-    GenericDownloader(SystemData& system, String url, IGuiDownloaderUpdater& updater);
 
     /*
      * Http::IDownload implementation
@@ -38,14 +36,14 @@ class GenericDownloader : public BaseSystemDownloader
      * @param currentSize downloaded bytes
      * @param expectedSize total expected bytes
      */
-    void DownloadProgress(const Http& http, long long currentSize, long long expectedSize) override;
+    void DownloadProgress(const HttpClient& http, long long currentSize, long long expectedSize) override;
 
   private:
     //! Game fetching URL
     static constexpr const char* sRepoBaseURL = "https://gitlab.com/recalbox/packages/game-providers/%s/-/archive/main/wasp4-main.zip";
 
     //! Http request object
-    Http mRequest;
+    HttpClient mRequest;
 
     //! Sync messager
     SyncMessageSender<GenericDownloadingGameState> mSender;
@@ -63,9 +61,6 @@ class GenericDownloader : public BaseSystemDownloader
 
     //! Extracted games
     int mGames;
-
-    // source url
-    String mUrl = "";
 
     /*!
      * @brief Receive synchronous code

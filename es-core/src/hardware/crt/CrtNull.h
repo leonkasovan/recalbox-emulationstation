@@ -12,7 +12,7 @@ class CrtNull : public ICrtInterface
 {
   public:
     //! Constructor
-    explicit CrtNull(bool automaticallyDetected) : ICrtInterface(automaticallyDetected) {}
+    explicit CrtNull(bool automaticallyDetected, BoardType boardType) : ICrtInterface(automaticallyDetected, boardType) {}
 
     bool IsCrtAdapterAttached() const override { return false; }
 
@@ -25,7 +25,8 @@ class CrtNull : public ICrtInterface
     bool HasForced50hzSupport() const override { return false; }
 
     bool MustForce50Hz() const override { return false; }
+
+    std::string& Name() const override { static std::string adapterString("None"); return adapterString; }
+
+    std::string& ShortName() const override { static std::string adapterShortString(""); return adapterShortString; }
 };
-
-
-

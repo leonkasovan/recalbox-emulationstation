@@ -316,6 +316,7 @@ void AlsaController::SetDefaultPlayback(int identifier)
       case BoardType::Pi02:
       case BoardType::Pi4:
       case BoardType::Pi400:
+      case BoardType::Pi5:
       case BoardType::UnknownPi:
       case BoardType::OdroidAdvanceGo:
       case BoardType::PCx86:

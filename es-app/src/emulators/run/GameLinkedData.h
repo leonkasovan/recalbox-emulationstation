@@ -11,6 +11,7 @@
 #include <emulators/run/PatchData.h>
 #include "SuperGameBoyData.h"
 #include <emulators/run/SaveStateData.h>
+#include "JammaData.h"
 
 class GameLinkedData
 {
@@ -65,7 +66,6 @@ class GameLinkedData
     //! Get read only Patch data
     [[nodiscard]] const PatchData& Patch() const { return mPatchData; }
 
-
     //! Get writable Supergameboy data
     SuperGameBoyData& ConfigurableSuperGameBoy() { return mSuperGameBoyData; }
 
@@ -75,6 +75,8 @@ class GameLinkedData
     //! Get read only savestate data
     [[nodiscard]] const SaveStateData& SaveState() const { return mSaveSateData; }
 
+    //! Get read only Jamma data
+    const JammaData& Jamma() const { return mJammaData; }
 
   private:
     //! Netplay data
@@ -89,4 +91,5 @@ class GameLinkedData
     SuperGameBoyData mSuperGameBoyData;
 
     SaveStateData mSaveSateData;
+    JammaData mJammaData;
 };

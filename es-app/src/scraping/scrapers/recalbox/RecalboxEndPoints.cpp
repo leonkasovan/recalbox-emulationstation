@@ -117,15 +117,18 @@ RecalboxEndPoints::RecalboxEndPoints()
     case BoardType::Pi3plus:              mBoard = "RPi 3B+"; break;
     case BoardType::Pi4:                  mBoard = "RPi 4"; break;
     case BoardType::Pi400:                mBoard = "RPi 400"; break;
+    case BoardType::Pi5:                  mBoard = "RPi 5"; break;
     case BoardType::UnknownPi:            mBoard = "unknown RPi"; break;
     case BoardType::OdroidAdvanceGo:      mBoard = "Odroid GO Advance"; break;
     case BoardType::OdroidAdvanceGoSuper: mBoard = "Odroid GO Super"; break;
     case BoardType::PCx86:                mBoard = "x86"; break;
     case BoardType::PCx64:                mBoard = "x64"; break;
+    case BoardType::RG351P:               mBoard = "RG351P/M"; break;
     case BoardType::RG353P:               mBoard = "RG353P"; break;
     case BoardType::RG353V:               mBoard = "RG353V"; break;
     case BoardType::RG353M:               mBoard = "RG353M"; break;
     case BoardType::RG503:                mBoard = "RG503"; break;
+    case BoardType::RG351V:               mBoard = "RG351V"; break;
   }
 
   String servers = mDns.GetTxtRecord(sRootDomainName);

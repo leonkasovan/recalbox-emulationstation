@@ -106,7 +106,7 @@ list(APPEND ES_HEADERS
 # define target
 include_directories(${COMMON_INCLUDE_DIRS} src src/mqtt/paho/c src/mqtt/paho/cpp)
 add_executable(emulationstation ${ES_SOURCES} ${ES_HEADERS})
-target_link_libraries(emulationstation ${COMMON_LIBRARIES} es-core resolv blkid lzma)
+target_link_libraries(emulationstation ${COMMON_LIBRARIES} es-core)
 
 #-------------------------------------------------------------------------------
 # set up CPack install stuff so `make install` does something useful

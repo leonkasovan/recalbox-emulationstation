@@ -207,7 +207,7 @@ class ArcadeGameListView : public DetailedGameListView
      * @brief Get driver list (arcade view only)
      * @return Driver list
      */
-    [[nodiscard]] std::vector<ArcadeDatabase::Driver> GetDriverList() const override;
+    [[nodiscard]] std::vector<ArcadeDatabase::Manufacturer> GetManufacturerList() const override;
 
     /*!
      * @brief Get the current emulator name for the current folder
@@ -226,11 +226,19 @@ class ArcadeGameListView : public DetailedGameListView
      * @param driverIndex Driver index
      * @return Game count
      */
-    [[nodiscard]] int GetGameCountForDriver(int driverIndex) const override;
+    [[nodiscard]] int GetGameCountForManufacturer(int driverIndex) const override;
 
     /*!
      * @brief Check if the current database can be filtered
      * @return
      */
-    [[nodiscard]] bool CanBeFiltered() const override { return mDatabase != nullptr && mDatabase->CanBeFiltered(); };
+    [[nodiscard]] bool CanBeFiltered() const override { return mDatabase != nullptr && mDatabase->CanBeFiltered(); }
+
+    /*!
+     * @brief Check if at least one manufacturer in the Limited manufacturers holder match one of the manufacturer in the given set
+     * @param manufacturerSet manufacturer set
+     * @param manufacturers manufacturer holders
+     * @return True if at least one match has been found, false otherwise
+     */
+    static bool HasMatchingManufacturer(const HashSet<int>& manufacturerSet, const ArcadeGame::LimitedManufacturerHolder& manufacturers);
 };

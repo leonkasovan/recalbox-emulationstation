@@ -115,6 +115,13 @@ MD5::MD5(const String &text)
   finalize();
 }
 
+MD5::MD5(const char* text, size_type size)
+{
+  init();
+  update(text, size);
+  finalize();
+}
+
 //////////////////////////////
 
 void MD5::init()
@@ -357,6 +364,13 @@ std::ostream& operator<<(std::ostream& out, MD5 md5)
 String md5(const String& str)
 {
   MD5 md5 = MD5(str);
+
+  return md5.hexdigest();
+}
+
+std::string md5(const char* text, unsigned int length)
+{
+  MD5 md5 = MD5(text, length);
 
   return md5.hexdigest();
 }

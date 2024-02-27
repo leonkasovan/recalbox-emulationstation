@@ -138,7 +138,7 @@ void GuiMenuGamelistGameDeleteSelectionOptions::DeleteSelectedFiles()
   {
     mView.removeEntry(&mGame);
   }
-  mWindow.deleteAllGui();
+  mWindow.CloseAll();
 }
 
 String GuiMenuGamelistGameDeleteSelectionOptions::ComputeMessage()

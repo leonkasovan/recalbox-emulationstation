@@ -9,10 +9,10 @@
 
 VideoComponent::VideoComponent(WindowManager&window)
 : Component(window),
+  mVideoPath(""),
   mState(State::Uninitialized),
   mEffect(Effect::BreakingNews),
   mTargetSize(0),
-  mVideoPath(""),
   mTargetIsMax(false),
   mVertices{ { { 0, 0 }, { 0, 0 } } },
   mColors{ 0 },
@@ -30,7 +30,7 @@ void VideoComponent::resize()
 {
   VideoEngine::Instance().AquireTexture();
   TextureData& texture = VideoEngine::Instance().GetDisplayableFrame();
-  const Vector2f textureSize(texture.width(), texture.height());
+  const Vector2f textureSize((float)texture.width(), (float)texture.height());
   VideoEngine::Instance().ReleaseTexture();
 
   if (textureSize.isZero()) return;
@@ -92,7 +92,7 @@ void VideoComponent::resize()
 
 void VideoComponent::setVideo(const Path& path, int delay, int loops, bool decodeAudio)
 {
-  AudioManager::Instance().ResumeMusicIfNecessary();
+  AudioManager::ResumeMusicIfNecessary();
   VideoEngine::Instance().StopVideo(true);
   mVideoPath = path;
   mVideoDelay = delay;
@@ -258,7 +258,7 @@ bool VideoComponent::ProcessDisplay(double& effect)
         mState = State::StartVideo;
         mTimer.Initialize(0);
         //{ LOG(LogDebug) << "[VideoComponent] Timer reseted: State::BumpVideo " + DateTime().ToPreciseTimeStamp() << " elapsed: " << elapsed; }
-        AudioManager::Instance().PauseMusicIfNecessary();
+        AudioManager::PauseMusicIfNecessary();
       }
       break;
     }
@@ -266,6 +266,7 @@ bool VideoComponent::ProcessDisplay(double& effect)
     {
       video = true;
       effect = ProcessEffect(elapsed, true);
+      for(Component* component : mLinked) component->setOpacity(255 - (unsigned char)((255 * Math::clampi(elapsed, 0, mVideoEffect)) / mVideoEffect));
       if (elapsed >= mVideoEffect)
       {
         mState = State::DisplayVideo;
@@ -291,6 +292,7 @@ bool VideoComponent::ProcessDisplay(double& effect)
     {
       video = true;
       effect = ProcessEffect(elapsed, false);
+      for(Component* component : mLinked) component->setOpacity((unsigned char)((255 * Math::clampi(elapsed, 0, mVideoEffect)) / mVideoEffect));
       if (elapsed >= mVideoEffect)
       {
         mState = State::Uninitialized;
@@ -299,7 +301,7 @@ bool VideoComponent::ProcessDisplay(double& effect)
         //{ LOG(LogDebug) << "[VideoComponent] Timer reseted: State::DisplayImage " + DateTime().ToPreciseTimeStamp() << " elapsed: " << elapsed; }
         video = false;
       }
-      AudioManager::Instance().ResumeMusicIfNecessary();
+      AudioManager::ResumeMusicIfNecessary();
       break;
     }
   }

@@ -6,8 +6,8 @@
 #include <components/ImageComponent.h>
 #include <resources/Font.h>
 #include <input/InputManager.h>
-#include "bluetooth/BluetoothOverlayGUI.h"
 #include "guis/PopupType.h"
+#include "osd/OSDManager.h"
 
 // Forward declaration
 class GuiInfoPopupBase;
@@ -123,7 +123,6 @@ class WindowManager
      */
     virtual bool UpdateHelpSystem();
 
-
     /*!
      * @brief Check if at least a GUI on the stack is claiming not to be disturbed!
      * @return
@@ -138,16 +137,19 @@ class WindowManager
     }
 
     /*!
-     * @brief Get access to bluetooth notifier
-     * @return Bluetooth notifier instance
-     */
-    BluetoothOverlayGUI& BluetoothNotifier() { return mBluetooth; }
-
-    /*!
      * @brief Rotate
      * @return
      */
     virtual void Rotate(RotationType rotation) = 0;
+
+    //! Get OSD manager
+    OSDManager& OSD() { return mOSD; }
+
+    /*!
+     * @brief Set display visibility. Usually set to false while loading a single system in autorun mode
+     * @param visible Visibility
+     */
+    void SetDisplayEnabled(bool enabled) { mDisplayEnabled = enabled; }
 
   private:
     //! Maximum popup info
@@ -164,6 +166,9 @@ class WindowManager
 
     static bool KonamiCode(const InputCompactEvent& input);
 
+    //! OSD Manager
+    OSDManager mOSD;
+
     HelpComponent mHelp;
     ImageComponent mBackgroundOverlay;
     Array<GuiInfoPopupBase*> mInfoPopups;
@@ -174,17 +179,16 @@ class WindowManager
     String::List mScrollTitle;
 
     std::vector<std::shared_ptr<Font> > mDefaultFonts;
-    std::unique_ptr<TextCache> mFrameDataText;
-    BluetoothOverlayGUI mBluetooth;
 
-    int mFrameTimeElapsed;
-    int mFrameCountElapsed;
     int mAverageDeltaTime;
     unsigned int mTimeSinceLastInput;
 
     bool mNormalizeNextUpdate;
     bool mSleeping;
     bool mRenderedHelpPrompts;
+
+    //! Screen refresh enabled?
+    bool mDisplayEnabled;
 
     /*!
      * @brief Delete GUI pending for deletion

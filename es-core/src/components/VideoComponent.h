@@ -28,6 +28,12 @@ class VideoComponent : public Component
       _LastItem,
     };
 
+    //! Video path
+    Path mVideoPath;
+
+    //! Linked component to fade out/in when the video starts/ends
+    Array<Component*> mLinked;
+
     //! Video state
     State mState;
 
@@ -35,8 +41,6 @@ class VideoComponent : public Component
     Effect mEffect;
 
     Vector2f mTargetSize;
-
-    Path mVideoPath;
     bool mTargetIsMax;
 
     // Calculates the correct mSize from our resizing information (set by setResize/setMaxSize).
@@ -60,7 +64,7 @@ class VideoComponent : public Component
 
     //! Time to vidéo
     int mVideoDelay;
-    //! Effect timeing
+    //! Effect timing
     int mVideoEffect;
     //! Video loop (0 for infinite loop)
     int mVideoLoop;
@@ -131,6 +135,12 @@ class VideoComponent : public Component
     bool getHelpPrompts(Help& help)  override;
 
     bool isDiplayed();
+
+    /*!
+     * @brief Add a linked component
+     * @param component Linked component
+     */
+    void LinkComponent(Component* component) { mLinked.Add(component); }
 
     static constexpr int DEFAULT_VIDEODELAY = 2000;
     static constexpr int DEFAULT_VIDEOEFFET = 500;

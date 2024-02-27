@@ -6,12 +6,12 @@ static Path recalboxConfFile("/recalbox/share/system/recalbox.conf");
 static Path recalboxConfFileInit("/recalbox/share_init/system/recalbox.conf");
 
 RecalboxConf::RecalboxConf()
-  : IniFile(recalboxConfFile, recalboxConfFileInit, false),
+  : IniFile(recalboxConfFile, recalboxConfFileInit, false, true),
     StaticLifeCycleControler<RecalboxConf>("RecalboxConf")
 {
 }
 
-void RecalboxConf::OnSave()
+void RecalboxConf::OnSave() const
 {
   NotificationManager::Instance().Notify(Notification::ConfigurationChanged, recalboxConfFile.ToString());
 }
@@ -32,6 +32,7 @@ RecalboxConf::SoftPatching RecalboxConf::SoftPatchingFromString(const String& so
 {
   if (softpatching == "auto") return SoftPatching::Auto;
   if (softpatching == "select") return SoftPatching::Select;
+  if (softpatching == "launchLast") return SoftPatching::LaunchLast;
 
   return SoftPatching::Disable;
 }
@@ -42,6 +43,7 @@ const String& RecalboxConf::SoftPatchingFromEnum(SoftPatching softpatching)
   {
     case SoftPatching::Auto: { static String s("auto"); return s; }
     case SoftPatching::Select: { static String s("select"); return s; }
+    case SoftPatching::LaunchLast: { static String s("launchLast"); return s; }
     case SoftPatching::Disable:
     default: break;
   }
@@ -51,26 +53,26 @@ const String& RecalboxConf::SoftPatchingFromEnum(SoftPatching softpatching)
 
 RecalboxConf::Screensaver RecalboxConf::ScreensaverFromString(const String& screensaver)
 {
-  if (screensaver == "dim") return Screensaver::Dim;
+  if (screensaver == "black") return Screensaver::Black;
   if (screensaver == "demo") return Screensaver::Demo;
   if (screensaver == "gameclip") return Screensaver::Gameclip;
   if (screensaver == "suspend") return Screensaver::Suspend;
 
-  return Screensaver::Black;
+  return Screensaver::Dim;
 }
 
 const String& RecalboxConf::ScreensaverFromEnum(RecalboxConf::Screensaver screensaver)
 {
   switch(screensaver)
   {
-    case Screensaver::Dim: { static String s("dim"); return s; }
     case Screensaver::Demo: { static String s("demo"); return s; }
     case Screensaver::Gameclip: { static String s("gameclip"); return s; }
     case Screensaver::Suspend: { static String s("suspend"); return s; }
-    case Screensaver::Black:
+    case Screensaver::Black: { static String s("black"); return s; }
+    case Screensaver::Dim:
     default: break;
   }
-  static String s("black");
+  static String s("dim");
   return s;
 }
 
@@ -113,6 +115,32 @@ const String& RecalboxConf::RelayFromEnum(RecalboxConf::Relay relay)
     case Relay::None: default: break;
   }
   static String sDefault = "none";
+  return sDefault;
+}
+
+RecalboxConf::PadOSDType RecalboxConf::PadOSDTypeFromString(const String& pad)
+{
+  if (pad == "megadrive") return PadOSDType::MD;
+  if (pad == "xbox") return PadOSDType::XBox;
+  if (pad == "playstation") return PadOSDType::PSX;
+  if (pad == "nintendo64") return PadOSDType::N64;
+  if (pad == "dreamcast") return PadOSDType::DC;
+  return PadOSDType::Snes;
+}
+
+const String& RecalboxConf::PadOSDTypeFromEnum(PadOSDType type)
+{
+  switch(type)
+  {
+    case PadOSDType::MD: { static String s = "megadrive"; return s; }
+    case PadOSDType::XBox: { static String s = "xbox"; return s; }
+    case PadOSDType::PSX: { static String s = "playstation"; return s; }
+    case PadOSDType::N64: { static String s = "nintendo64"; return s; }
+    case PadOSDType::DC: { static String s = "dreamcast"; return s; }
+    case PadOSDType::Snes:
+    default: break;
+  }
+  static String sDefault = "snes";
   return sDefault;
 }
 
@@ -187,5 +215,10 @@ DefineEmulationStationSystemGetterSetterImplementation(FlatFolders, bool, Bool, 
 DefineEmulationStationSystemGetterSetterNumericEnumImplementation(Sort, FileSorts::Sorts, sSystemSort, FileSorts::Sorts::FileNameAscending)
 DefineEmulationStationSystemGetterSetterNumericEnumImplementation(RegionFilter, Regions::GameRegions, sSystemRegionFilter, Regions::GameRegions::Unknown)
 
-DefineEmulationStationSystemListGetterSetterImplementation(ArcadeSystemHiddenDrivers, sArcadeSystemHiddenDrivers, "")
+DefineEmulationStationSystemListGetterSetterImplementation(ArcadeSystemHiddenManufacturers, sArcadeSystemHiddenManufacturers, "")
+
+void RecalboxConf::Watch(const String& key, IRecalboxConfChanged& callback)
+{
+  mWatchers[key].Add(&callback);
+}
 

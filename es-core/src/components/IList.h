@@ -273,6 +273,12 @@ class IList : public Gui
       mEntries.push_back(e);
     }
 
+    // entry management
+    void insert(int index, const Entry& e)
+    {
+      mEntries.insert(mEntries.begin() + index, e);
+    }
+
     // insert at the beginning
     void unshift(const Entry& e)
     {

@@ -4,8 +4,8 @@
 #pragma once
 
 #include <utils/os/fs/Path.h>
-#include <utils/Xml.h>
 #include <utils/hash/Md5.h>
+#include <utils/Xml.h>
 
 /*!
  * @brief Single bios entry class
@@ -102,7 +102,7 @@ class Bios
          * @param other Md5 to compare to
          * @return True if both hashes match
          */
-        bool IsMatching(const Md5Hash& other)
+        bool IsMatching(const Md5Hash& other) const
         {
           return memcmp(mBytes, other.mBytes, sizeof(mBytes)) == 0;
         }
@@ -111,16 +111,19 @@ class Bios
          * @brief Check if the MD5 is valid: either copied from a valid one or computed from MD5 class or deserialized
          * @return True if the current MD5 is valid
          */
-        bool IsValid() const { return mValid; }
+        [[nodiscard]] bool IsValid() const { return mValid; }
 
         /*!
          * @brief String representation of the MD5
          * @return string
          */
-        String ToString() const;
+        [[nodiscard]] String ToString() const;
     };
 
-    //! Bios path (absolute)
+    //! Bios root
+    const Path mBiosRoot;
+
+    //! Bios path
     Path mPath[sMaxBiosPath];
     //! Core list
     String mCores;
@@ -140,6 +143,14 @@ class Bios
     //! Work status
     ReportStatus mReportStatus;
 
+    //! Bios move status
+    bool mMoved;
+    //! Bios move error status
+    bool mMoveFailed;
+
+    //! Get path string
+    [[nodiscard]] String PathString(int index) const;
+
   public:
     /*!
      * @brief Default constructor
@@ -156,7 +167,7 @@ class Bios
      * @brief Is the current bios valid?
      * @return True if
      */
-    bool IsValid() const { return !mPath[0].IsEmpty() && !mCores.empty() && !mHashes.empty(); }
+    [[nodiscard]] bool IsValid() const { return !mPath[0].IsEmpty() && !mCores.empty() && !mHashes.empty(); }
 
     /*!
      * @brief Scan the bios & update internal status
@@ -168,32 +179,32 @@ class Bios
      * @param core Core to seek for
      * @return True of the current bios is for the given core
      */
-    bool IsForCore(const String& core) const;
+    [[nodiscard]] bool IsForCore(const String& core) const;
 
     /*!
      * @brief Generate missing bios report
      * @return Text Report
      */
-    String GenerateReport() const;
+    [[nodiscard]] String GenerateReport() const;
 
     /*
      * Accessors
      */
 
     //! Check if this bios is mandatory
-    bool IsMandatory() const { return mMandatory; }
+    [[nodiscard]] bool IsMandatory() const { return mMandatory; }
 
     //! Check if hashmatching is mandatory for this bios
-    bool IsHashMatchingMandatory() const { return mHashMatchMandatory; }
+    [[nodiscard]] bool IsHashMatchingMandatory() const { return mHashMatchMandatory; }
 
     //! Report real status
-    Status BiosStatus() const { return mStatus; }
+    [[nodiscard]] Status BiosStatus() const { return mStatus; }
 
     //! Report light status
-    ReportStatus LightStatus() const { return mReportStatus; }
+    [[nodiscard]] ReportStatus LightStatus() const { return mReportStatus; }
 
     //! Report real status
-    const char* BiosStatusAsString() const
+    [[nodiscard]] const char* BiosStatusAsString() const
     {
       switch(mStatus)
       {
@@ -206,7 +217,7 @@ class Bios
     }
 
     //! Report light status
-    const char* LightStatusAsString() const
+    [[nodiscard]] const char* LightStatusAsString() const
     {
       switch(mReportStatus)
       {
@@ -218,28 +229,41 @@ class Bios
       return "unknown";
     }
 
+    //! Return move status
+    [[nodiscard]] bool MoveStatus() const { return mMoved; }
+    //! Return move error status
+    [[nodiscard]] bool MoveErrorStatus() const { return mMoveFailed; }
+
+    /*!
+     * @brief Check the given md5 against the known md5 list
+     * and return true if a matching is found
+     * @param md5 MD5 to check
+     * @return True if the given md5 match one of the known MD5
+     */
+    bool IsMD5Known(const String& md5) const;
+
     /*!
      * @brief Get bios name
      * @param shorten Get a short name instead of the long path
      * @return bios name
      */
-    String Filename(bool shorten = true) const;
+    [[nodiscard]] String Filename(bool shorten = true) const;
 
     //! Bios file path
-    const Path& Filepath() const { return mPath[0]; }
+    [[nodiscard]] const Path& Filepath() const { return mPath[0]; }
 
     //! Core list
-    const String& Cores() const { return mCores; }
+    [[nodiscard]] const String& Cores() const { return mCores; }
 
     //! Note
-    const String& Notes() const { return mNotes; }
+    [[nodiscard]] const String& Notes() const { return mNotes; }
 
     //! Current bios MD5
-    String CurrentMD5() const { return mRealFileHash.ToString(); }
+    [[nodiscard]] String CurrentMD5() const { return mRealFileHash.ToString(); }
 
     //! All MD5 list
-    String::List MD5List() const;
+    [[nodiscard]] String::List MD5List() const;
 
     //! MD5 Count
-    int MD5Count() const { return (int)mHashes.size(); }
+    [[nodiscard]] int MD5Count() const { return (int)mHashes.size(); }
 };

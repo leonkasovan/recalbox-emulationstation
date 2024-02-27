@@ -32,6 +32,7 @@ class GuiMenuBootSettings : public GuiMenuBase
       SelectedSystem,
       StartOnGamelist,
       HideSystemView,
+      SplashEnabled,
     };
 
     //! System manager
@@ -50,7 +51,7 @@ class GuiMenuBootSettings : public GuiMenuBase
      * ISwitchComponent implementation
      */
 
-    void SwitchComponentChanged(int id, bool status) override;
+    void SwitchComponentChanged(int id, bool& status) override;
 };
 
 

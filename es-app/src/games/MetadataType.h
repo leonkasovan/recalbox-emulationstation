@@ -44,6 +44,7 @@ enum class MetadataType
   Core        = 0x08000000, //!< Core
   Ratio       = 0x10000000, //!< Screen ratio
   LastPatch   = 0x20000000, //!< Last selected patch
+  TimePlayed       = 0x40000000, //!< Time played in seconds
 };
 
 DEFINE_BITFLAG_ENUM(MetadataType, int)

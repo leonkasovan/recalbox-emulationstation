@@ -6,7 +6,6 @@
 #include <utils/String.h>
 #include <vector>
 #include <bios/Bios.h>
-#include <utils/Xml.h>
 
 class BiosList
 {
@@ -50,14 +49,14 @@ class BiosList
     explicit BiosList(XmlNode& systemNode);
 
     //! Get bios count for the current system
-    int BiosCount() const { return mBiosList.size(); }
+    [[nodiscard]] int BiosCount() const { return (int)mBiosList.size(); }
 
     /*!
      * @brief Get Bios at the given index (from 0 to BiosCounbt() - 1)
      * @param index Index
      * @return Bios object reference
      */
-    const Bios& BiosAt(int index) const { return mBiosList[index]; }
+    [[nodiscard]] const Bios& BiosAt(int index) const { return mBiosList[index]; }
 
     /*!
      * @brief Scan the bios file of the bios object at the given index and refresh its properties
@@ -82,27 +81,32 @@ class BiosList
      */
 
     //! Get system long name
-    const String& FullName() const { return mSystemFullName; }
+    [[nodiscard]] const String& FullName() const { return mSystemFullName; }
     //! Get system short name
-    const String& Name() const { return mSystemName; }
+    [[nodiscard]] const String& Name() const { return mSystemName; }
 
     /*!
      * @brief Get summary status of this bios list
      * @return Resport status
      */
-    Bios::ReportStatus ReportStatus() const;
+    [[nodiscard]] Bios::ReportStatus ReportStatus() const;
 
     //! Get total bios Ok
-    int TotalBiosOk() const;
+    [[nodiscard]] int TotalBiosOk() const;
     //! Get total bios Ko
-    int TotalBiosKo() const;
+    [[nodiscard]] int TotalBiosKo() const;
     //! Get total bios unsafe
-    int TotalBiosUnsafe() const;
+    [[nodiscard]] int TotalBiosUnsafe() const;
 
     //! Get total bios not found
-    int TotalFileNotFound() const;
+    [[nodiscard]] int TotalFileNotFound() const;
     //! Get total bios found with a matching hash
-    int TotalHashMatching() const;
+    [[nodiscard]] int TotalHashMatching() const;
     //! Get total bios found with a non-matching hash
-    int TotalHashNotMatching() const;
+    [[nodiscard]] int TotalHashNotMatching() const;
+
+    //! Return move status
+    [[nodiscard]] bool MoveStatus() const;
+    //! Return move error status
+    [[nodiscard]] bool MoveErrorStatus() const;
 };

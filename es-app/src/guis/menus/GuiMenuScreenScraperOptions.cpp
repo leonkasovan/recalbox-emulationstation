@@ -137,7 +137,7 @@ void GuiMenuScreenScraperOptions::OptionListComponentChanged(int id, int index,
     RecalboxConf::Instance().SetScreenScraperVideo(value).Save();
 }
 
-void GuiMenuScreenScraperOptions::SwitchComponentChanged(int id, bool status)
+void GuiMenuScreenScraperOptions::SwitchComponentChanged(int id, bool& status)
 {
   if ((Components)id == Components::Manuals) RecalboxConf::Instance().SetScreenScraperWantManual(status).Save();;
   if ((Components)id == Components::Maps) RecalboxConf::Instance().SetScreenScraperWantMaps(status).Save();;

@@ -5,9 +5,7 @@
 
 #include <vector>
 #include <utils/os/system/Thread.h>
-#ifndef PURE_BIOS_ONLY
-  #include <utils/sync/SyncMessageSender.h>
-#endif
+#include <utils/sync/SyncMessageSender.h>
 #include <utils/cplusplus/StaticLifeCycleControler.h>
 #include "BiosList.h"
 #include "IBiosScanReporting.h"
@@ -43,9 +41,7 @@ struct BiosMessage
 
 class BiosManager : public StaticLifeCycleControler<BiosManager>
                   , private Thread
-#ifndef PURE_BIOS_ONLY
                   , public ISyncMessageReceiver<BiosMessage>
-#endif
 {
   private:
     //! Path to bios.xml file
@@ -55,12 +51,12 @@ class BiosManager : public StaticLifeCycleControler<BiosManager>
 
     //! Bios list per system
     std::vector<BiosList> mSystemBiosList;
-    #ifndef PURE_BIOS_ONLY
     //! Sync'ed event sender
     SyncMessageSender<BiosMessage> mSender;
-    #endif
     //! Current scan's reporting interface (also flag for an already running scan)
     IBiosScanReporting* mReporting;
+    //! Protector
+    Mutex& mLocker;
 
     /*
      * Thread implementation
@@ -71,7 +67,6 @@ class BiosManager : public StaticLifeCycleControler<BiosManager>
      */
     void Run() override;
 
-    #ifndef PURE_BIOS_ONLY
     /*
      * ISynchronousInterface
      */
@@ -81,9 +76,15 @@ class BiosManager : public StaticLifeCycleControler<BiosManager>
      * @param event SDL event with .user populated by the sender
      */
     void ReceiveSyncMessage(const BiosMessage& event) override;
-    #endif
 
   public:
+    enum LookupResult
+    {
+      NotFound,      //!< Bios name not found or MD5 does not match any known md5
+      Found,         //!< Bios has been found either by name or MD5
+      AlreadyExists, //!< The given bios already exists with the same
+    };
+
     /*!
      * @brief Default constructor
      */
@@ -92,7 +93,7 @@ class BiosManager : public StaticLifeCycleControler<BiosManager>
     /*!
      * @brief Default destructor
      */
-    ~BiosManager() override { Thread::Join(); }
+    ~BiosManager() override { Thread::Join(); delete &mLocker; }
 
     /*!
      * @brief Load all bios from bios.xml
@@ -100,7 +101,11 @@ class BiosManager : public StaticLifeCycleControler<BiosManager>
     void LoadFromFile();
 
     //! Get system count
-    [[nodiscard]] int SystemCount() const { return (int)mSystemBiosList.size(); }
+    [[nodiscard]] int SystemCount() const
+    {
+      Mutex::AutoLock locker(mLocker);
+      return (int)mSystemBiosList.size();
+    }
 
     /*!
      * @brief Get bios list from the given system index
@@ -109,12 +114,13 @@ class BiosManager : public StaticLifeCycleControler<BiosManager>
      */
     [[nodiscard]] const BiosList& SystemBios(int index) const
     {
+      Mutex::AutoLock locker(mLocker);
       return mSystemBiosList[index];
     }
 
     /*!
      * @brief Lookup bios list for the given system
-     * @param name Syste name
+     * @param name System name
      * @return Bios list or nullptr if not found
      */
     [[nodiscard]] const BiosList& SystemBios(const String& name) const;
@@ -126,7 +132,20 @@ class BiosManager : public StaticLifeCycleControler<BiosManager>
     void Scan(IBiosScanReporting* reporting, bool sync = false);
 
     /*!
+     * @brief Try to lookup the given bios in all systems
+     * @param name Bios name
+     * @param md5 Bios md5
+     * @return LookupResult and outputPath set to bios path or empty path
+     */
+    LookupResult Lookup(const std::string& name, const std::string& md5, const Bios*& outputBios) const;
+
+    /*!
      * @brief Generate missing bios report in bios root folder
      */
     void GenerateReport() const;
+
+    //! Global move status
+    [[nodiscard]] bool Moved() const;
+    //! Global move error status
+    [[nodiscard]] bool MoveError() const;
 };

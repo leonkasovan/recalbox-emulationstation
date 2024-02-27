@@ -6,13 +6,14 @@
 //
 
 #include "GuiMenuGameSettings.h"
-#include "GuiMenuTools.h"
 #include "GuiMenuNetplay.h"
 #include "GuiMenuRetroAchievements.h"
+#include "GuiMenuTools.h"
 #include "guis/GuiMsgBox.h"
-#include <systems/SystemManager.h>
-#include <guis/MenuMessages.h>
+#include "views/MenuFilter.h"
 #include <LibretroRatio.h>
+#include <guis/MenuMessages.h>
+#include <systems/SystemManager.h>
 
 GuiMenuGameSettings::GuiMenuGameSettings(WindowManager& window, SystemManager& systemManager)
   : GuiMenuBase(window, _("GAMES SETTINGS"), this)
@@ -44,17 +45,29 @@ GuiMenuGameSettings::GuiMenuGameSettings(WindowManager& window, SystemManager& s
   // Press twice to quit
   AddSwitch(_("PRESS TWICE TO QUIT GAME"), RecalboxConf::Instance().GetGlobalQuitTwice(), (int)Components::QuitTwice, this, _(MENUMESSAGE_GAME_PRESS_TWICE_QUIT_HELP_MSG));
 
-  // Integer Scale
   if(!isCrt)
+  {
+    // Integer Scale
     AddSwitch(_("INTEGER SCALE (PIXEL PERFECT)"), RecalboxConf::Instance().GetGlobalIntegerScale(), (int)Components::IntegerScale, this, _(MENUMESSAGE_GAME_INTEGER_SCALE_HELP_MSG));
 
-  // Shaders preset
-  if(!isCrt)
+    // Shaders preset
     AddList<String>(_("SHADERS SET"), (int)Components::ShaderSet, this, GetShaderPresetsEntries(), _(MENUMESSAGE_GAME_SHADERSET_HELP_MSG));
 
-  // Shaders
-  if(!isCrt)
+    // Shaders
     AddList<String>(_("ADVANCED SHADERS"), (int)Components::Shaders, this, GetShadersEntries(), _(MENUMESSAGE_GAME_SHADERS_HELP_MSG));
+
+    // HD mode
+    if(MenuFilter::ShouldDisplayMenuEntry(MenuFilter::HDMode))
+      AddSwitch(_("HD MODE"), RecalboxConf::Instance().GetGlobalHDMode(), (int)Components::HDMode, this, _(MENUMESSAGE_GAME_HD_MODE_HELP_MSG));
+
+    // Widescreen mode
+    if(MenuFilter::ShouldDisplayMenuEntry(MenuFilter::Widescreen))
+      AddSwitch(_("WIDESCREEN (16/9)"), RecalboxConf::Instance().GetGlobalWidescreenMode(), (int)Components::WideScreenMode, this, _(MENUMESSAGE_GAME_WIDESCREEN_MODE_HELP_MSG));
+
+    if(Board::Instance().HasVulkanSupport())
+      AddSwitch(_("ENABLE VULKAN DRIVER"), RecalboxConf::Instance().GetGlobalVulkanDriver(), (int)Components::VulkanDriver, this, _(MENUMESSAGE_GAME_VULKAN_DRIVER_HELP_MSG));
+  }
+
 
   // Super GameBoy
   AddList<String>(_("GAME BOY MODE"), (int)Components::SuperGameBoy, this, GetSuperGameBoyEntries(), _(MENUMESSAGE_GAME_SUPERGAMEBOY_HELP_MSG));
@@ -109,6 +122,7 @@ std::vector<GuiMenuBase::ListEntry<RecalboxConf::SoftPatching>> GuiMenuGameSetti
   RecalboxConf::SoftPatching currentOption = RecalboxConf::Instance().GetGlobalSoftpatching();
 
   list.emplace_back( _("AUTO"), RecalboxConf::SoftPatching::Auto, currentOption == RecalboxConf::SoftPatching::Auto );
+  list.emplace_back( _("LAUNCH LAST"), RecalboxConf::SoftPatching::LaunchLast, currentOption == RecalboxConf::SoftPatching::LaunchLast );
   list.emplace_back( _("SELECT"), RecalboxConf::SoftPatching::Select, currentOption == RecalboxConf::SoftPatching::Select );
   list.emplace_back( _("DISABLE"), RecalboxConf::SoftPatching::Disable, currentOption == RecalboxConf::SoftPatching::Disable);
 
@@ -171,11 +185,14 @@ void GuiMenuGameSettings::OptionListComponentChanged(int id, int index, const St
     case Components::Softpatching:
     case Components::RetroAchivements:
     case Components::Netplay:
+    case Components::HDMode:
+    case Components::WideScreenMode:
+    case Components::VulkanDriver:
     default: break;
   }
 }
 
-void GuiMenuGameSettings::SwitchComponentChanged(int id, bool status)
+void GuiMenuGameSettings::SwitchComponentChanged(int id, bool& status)
 {
   switch((Components)id)
   {
@@ -200,6 +217,9 @@ void GuiMenuGameSettings::SwitchComponentChanged(int id, bool status)
       break;
     case Components::QuitTwice: RecalboxConf::Instance().SetGlobalQuitTwice(status).Save(); break;
     case Components::IntegerScale: RecalboxConf::Instance().SetGlobalIntegerScale(status).Save(); break;
+    case Components::HDMode: RecalboxConf::Instance().SetGlobalHDMode(status).Save(); break;
+    case Components::WideScreenMode: RecalboxConf::Instance().SetGlobalWidescreenMode(status).Save(); break;
+    case Components::VulkanDriver: RecalboxConf::Instance().SetGlobalVulkanDriver(status).Save(); break;
     case Components::Ratio:
     case Components::Softpatching:
     case Components::Shaders:

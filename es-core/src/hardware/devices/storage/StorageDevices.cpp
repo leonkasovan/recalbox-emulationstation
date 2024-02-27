@@ -38,7 +38,8 @@ void StorageDevices::Initialize()
 
   // Go advance does not support external storage
   if ((Board::Instance().GetBoardType() == BoardType::OdroidAdvanceGo) ||
-      (Board::Instance().GetBoardType() == BoardType::OdroidAdvanceGoSuper)) return;
+      (Board::Instance().GetBoardType() == BoardType::OdroidAdvanceGoSuper) ||
+      (Board::Instance().GetBoardType() == BoardType::RG351P)) return;
 
   // Any external
   mDevices.push_back(Device(Types::Internal, "",  sAnyExternal, "", "",_("Any External Device"), current == sAnyExternal, sizeInfos));

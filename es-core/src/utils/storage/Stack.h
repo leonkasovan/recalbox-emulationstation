@@ -55,7 +55,7 @@ template<typename T> class Stack : private Allocator
     {
       if (index >= fCount) return *((T*)nullptr);
       T poped = __GET(index);
-      if (index < fCount - 1) memcpy(&__GET(index), &__GET(index + 1), __OBJSZ * (fCount - index - 1));
+      if (index < fCount - 1) memmove(&__GET(index), &__GET(index + 1), __OBJSZ * (fCount - index - 1));
       fCount--;
       return poped;
     }
@@ -76,7 +76,7 @@ template<typename T> class Stack : private Allocator
     {
       if (index < fCount)
       {
-        if (index < fCount - 1) memcpy(&__GET(index), &__GET(index + 1), __OBJSZ * (fCount - index - 1));
+        if (index < fCount - 1) memmove(&__GET(index), &__GET(index + 1), __OBJSZ * (fCount - index - 1));
         fCount--;
       }
     }

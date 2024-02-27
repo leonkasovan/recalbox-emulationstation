@@ -22,8 +22,15 @@ NotificationManager::NotificationManager(char** environment)
   : StaticLifeCycleControler<NotificationManager>("NotificationManager"),
     mMQTTClient("recalbox-emulationstation", nullptr),
     mEnvironment(environment)
+  , mProcessing(false)
 {
   LoadScriptList();
+  Thread::Start("EventNotifier");
+}
+
+NotificationManager::~NotificationManager()
+{
+  Thread::Stop();
 }
 
 const char* NotificationManager::ActionToString(Notification action)
@@ -92,24 +99,24 @@ Notification NotificationManager::ActionFromString(const String& action)
 
 bool NotificationManager::ExtractSyncFlagFromPath(const Path& path)
 {
-  const String& scriptName = path.FilenameWithoutExtension().LowerCase();
-  return (scriptName.find("(sync)") != String::npos);
+  const String scriptName = path.FilenameWithoutExtension().LowerCase();
+  return (scriptName.Contains("(sync)"));
 }
 
 bool NotificationManager::ExtractPermanentFlagFromPath(const Path& path)
 {
-  const String& scriptName = path.FilenameWithoutExtension().LowerCase();
-  return (scriptName.find("(permanent)") != String::npos);
+  const String scriptName = path.FilenameWithoutExtension().LowerCase();
+  return (scriptName.Contains("(permanent)"));
 }
 
 Notification NotificationManager::ExtractNotificationsFromPath(const Path& path)
 {
   // Extract events between [ and ] in filename
-  const String& scriptName = path.FilenameWithoutExtension().LowerCase();
-  unsigned long start = scriptName.find('[');
-  unsigned long stop = scriptName.find(']');
+  const String scriptName = path.FilenameWithoutExtension().LowerCase();
+  int start = scriptName.Find('[');
+  int stop = scriptName.Find(']');
 
-  if (((start | stop) == String::npos) || (stop - start <= 1)) return (Notification)-1;
+  if (((start | stop) < 0) || (stop - start <= 1)) return (Notification)-1;
 
   Notification result = Notification::None;
   // Split events
@@ -134,12 +141,12 @@ void NotificationManager::LoadScriptList()
         if (permanent)
         {
           RunProcess(path, {}, false, true);
-          { LOG(LogInfo) << "[Script] Run permanent UserScript: " << path.ToString(); }
+          { LOG(LogDebug) << "[Script] Run permanent UserScript: " << path.ToString(); }
         }
         else
         {
           mScriptList.push_back({ path, ExtractNotificationsFromPath(path), synced });
-          { LOG(LogInfo) << "[Script] Scan UserScript: " << path.ToString(); }
+          { LOG(LogDebug) << "[Script] Scan UserScript: " << path.ToString(); }
         }
       }
 }
@@ -177,6 +184,63 @@ void NotificationManager::RunScripts(Notification action, const String& param)
     // Run!
     RunProcess(script->mPath, args, script->mSync, false);
   }
+}
+
+JSONBuilder NotificationManager::BuildJsonPacket(const NotificationManager::NotificationRequest& request)
+{
+  String emulator;
+  String core;
+  JSONBuilder builder;
+
+  builder.Open();
+
+  // Action
+  builder.Field("Action", ActionToString(request.mAction))
+         .Field("Parameter", request.mActionParameters)
+         .Field("Version", LEGACY_STRING("2.0"));
+  // System
+  if (request.mSystemData != nullptr)
+  {
+    builder.OpenObject("System")
+           .Field("System", request.mAction == Notification::RunKodi ? "kodi" : request.mSystemData->FullName())
+           .Field("SystemId", request.mAction == Notification::RunKodi ? "kodi" : request.mSystemData->Name());
+    if (!request.mSystemData->IsVirtual())
+      if (EmulatorManager::GetDefaultEmulator(*request.mSystemData, emulator, core))
+        builder.OpenObject("DefaultEmulator")
+               .Field("Emulator", emulator)
+               .Field("Core", core)
+               .CloseObject();
+    builder.CloseObject();
+  }
+  // Game
+  if (request.mFileData != nullptr)
+  {
+    builder.OpenObject("Game")
+           .Field("Game", request.mFileData->Name())
+           .Field("GamePath", request.mFileData->RomPath().ToString())
+           .Field("IsFolder", request.mFileData->IsFolder())
+           .Field("ImagePath", request.mFileData->Metadata().Image().ToString())
+           .Field("ThumbnailPath", request.mFileData->Metadata().Thumbnail().ToString())
+           .Field("VideoPath", request.mFileData->Metadata().Video().ToString())
+           .Field("Developer", request.mFileData->Metadata().Developer())
+           .Field("Publisher", request.mFileData->Metadata().Publisher())
+           .Field("Players", request.mFileData->Metadata().PlayersAsString())
+           .Field("Region", request.mFileData->Metadata().RegionAsString())
+           .Field("Genre", request.mFileData->Metadata().Genre())
+           .Field("GenreId", request.mFileData->Metadata().GenreIdAsString())
+           .Field("Favorite", request.mFileData->Metadata().Favorite())
+           .Field("Hidden", request.mFileData->Metadata().Hidden())
+           .Field("Adult", request.mFileData->Metadata().Adult());
+    if (EmulatorManager::GetGameEmulator(*request.mFileData, emulator, core))
+      builder.OpenObject("SelectedEmulator")
+             .Field("Emulator", emulator)
+             .Field("Core", core)
+             .CloseObject();
+    builder.CloseObject();
+  }
+  builder.Close();
+
+  return builder;
 }
 
 void NotificationManager::BuildStateCommons(String& output, const SystemData* system, const FileData* game, Notification action, const String& actionParameters)
@@ -228,7 +292,7 @@ void NotificationManager::BuildStateGame(String& output, const FileData* game, N
   {
     String emulator;
     String core;
-    if (game->System().Manager().Emulators().GetGameEmulator(*game, emulator, core))
+    if (EmulatorManager::GetGameEmulator(*game, emulator, core))
       output.Append("Emulator=").Append(emulator).Append(eol).Append("Core=").Append(core).Append(eol);
   }
 }
@@ -241,7 +305,7 @@ void NotificationManager::BuildStateSystem(String& output, const SystemData* sys
   {
     String emulator;
     String core;
-    if (system->Manager().Emulators().GetDefaultEmulator(*system, emulator, core))
+    if (EmulatorManager::GetDefaultEmulator(*system, emulator, core))
       output.Append("DefaultEmulator=").Append(emulator).Append(eol).Append("DefaultCore=").Append(core).Append(eol);
   }
 }
@@ -278,44 +342,76 @@ void NotificationManager::BuildStateCompatibility(String& output, Notification a
   }
 }
 
+void NotificationManager::Break()
+{
+  mSignal.Fire();
+}
+
+void NotificationManager::Run()
+{
+  NotificationRequest* request = nullptr;
+  while(IsRunning())
+  {
+    mSignal.WaitSignal();
+    while(IsRunning())
+    {
+      // Get request
+      { Mutex::AutoLock locker(mSyncer); request = !mRequestQueue.Empty() ? mRequestQueue.Pop() : nullptr; }
+      if (request == nullptr) break;
+
+      { Mutex::AutoLock locker(mSyncer); mProcessing = true; }
+
+      // Process
+      if (*request != mPreviousRequest)
+      {
+        // Build all
+        String output("Version=2.0");
+        output.Append(eol);
+        BuildStateCommons(output, request->mSystemData, request->mFileData, request->mAction,
+                          request->mActionParameters);
+        BuildStateGame(output, request->mFileData, request->mAction);
+        BuildStateSystem(output, request->mSystemData, request->mAction);
+        BuildStateCompatibility(output, request->mAction);
+        // Save
+        Files::SaveFile(Path(sStatusFilePath), output);
+        // MQTT notification
+        mMQTTClient.Send(sEventTopic, ActionToString(request->mAction));
+
+        // Build json event
+        JSONBuilder json = BuildJsonPacket(*request);
+        // MQTT notification
+        mMQTTClient.Send(sEventJsonTopic, json);
+
+        // Run scripts
+        const String& notificationParameter = (request->mFileData != nullptr)
+                                                   ? request->mFileData->RomPath().ToString()
+                                                   : ((request->mSystemData != nullptr) ? request->mSystemData->Name()
+                                                                                        : request->mActionParameters);
+        RunScripts(request->mAction, notificationParameter);
+
+        mPreviousRequest = *request;
+      }
+
+      // Recycle
+      mRequestProvider.Recycle(request);
+    }
+    // End processing
+    { Mutex::AutoLock locker(mSyncer); mProcessing = false; }
+  }
+}
+
 void NotificationManager::Notify(const SystemData* system, const FileData* game, Notification action, const String& actionParameters)
 {
-//  why ?
-//  if (VideoEngine::IsInstantiated())
-//    VideoEngine::Instance().StopVideo();
+  // Build new parameter bag
+  NotificationRequest* request = mRequestProvider.Obtain();
+  request->Set(system, game, action, actionParameters);
 
-  String notificationParameter;
-  
-  if (game != nullptr){
-    notificationParameter = game->RomPath().ToString();
-  }else{
-    if (system != nullptr){
-      notificationParameter = system->Name();
-    }else{
-      notificationParameter = actionParameters;
-    }
-  }
-  // Check if it is the same event than in previous call
-  ParamBag newBag(system, game, action, notificationParameter);
-  if (newBag != mPreviousParamBag)
+  // Push new param bag
   {
-    // Build all
-    String output("Version=2.0"); output.Append(eol);
-    BuildStateCommons(output, system, game, action, notificationParameter);
-    BuildStateGame(output, game, action);
-    BuildStateSystem(output, system, action);
-    BuildStateCompatibility(output, action);
-
-    // Save
-    Files::SaveFile(Path(sStatusFilePath), output);
-
-    // MQTT notification
-    mMQTTClient.Send(sEventTopic, ActionToString(action));
-
-    // Run scripts
-    RunScripts(action, notificationParameter);
+    Mutex::AutoLock locker(mSyncer);
+    mRequestQueue.Push(request);
+    mSignal.Fire();
   }
-  mPreviousParamBag = newBag;
 }
 
 void NotificationManager::RunProcess(const Path& target, const String::List& arguments, bool synchronous, bool permanent)
@@ -329,8 +425,6 @@ void NotificationManager::RunProcess(const Path& target, const String::List& arg
   String ext = target.Extension().LowerCase();
   if      (ext == ".sh")  { command = "/bin/sh";          args.push_back(command.data()); }
   else if (ext == ".ash") { command = "/bin/ash";         args.push_back(command.data()); }
-  else if (ext == ".lua") { command = "/usr/bin/lua";     args.push_back(command.data()); }
-  else if (ext == ".luax"){ command = "/usr/bin/luax";    args.push_back(command.data()); }
   else if (ext == ".py")  { command = "/usr/bin/python";  args.push_back(command.data()); }
   else if (ext == ".py2") { command = "/usr/bin/python2"; args.push_back(command.data()); }
   else if (ext == ".py3") { command = "/usr/bin/python3"; args.push_back(command.data()); }
@@ -339,7 +433,7 @@ void NotificationManager::RunProcess(const Path& target, const String::List& arg
   args.push_back(target.ToChars());
   for (const String& argument : arguments) args.push_back(argument.c_str());
 
-  { LOG(LogInfo) << "[Script][novan] Run UserScript: " << args; }
+  { LOG(LogDebug) << "[Script] Run UserScript: " << args; }
 
   // Push final null
   args.push_back(nullptr);
@@ -383,11 +477,19 @@ bool NotificationManager::HasValidExtension(const Path& path)
   return (ext.empty()) ||
          (ext == ".sh" ) ||
          (ext == ".ash") ||
-         (ext == ".lua" ) ||
-         (ext == ".luax" ) ||
          (ext == ".py" ) ||
          (ext == ".py2") ||
          (ext == ".py3");
 }
 
-
+void NotificationManager::WaitCompletion()
+{
+  for(;;)
+  {
+    mSyncer.Lock();
+    bool havePendings = !mRequestQueue.Empty();
+    mSyncer.UnLock();
+    if (!havePendings && !mProcessing) break;
+    Thread::Sleep(100);
+  }
+}

@@ -54,5 +54,7 @@ class NullBoard: public IBoardInterface
     void HeadphoneUnplugged() final {};
 
     void SetFrontendCPUGovernor() final {};
+
+    bool HasVulkanSupport() final { return false;};
 };
 

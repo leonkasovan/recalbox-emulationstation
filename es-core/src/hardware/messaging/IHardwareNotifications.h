@@ -81,4 +81,16 @@ class IHardwareNotifications
      */
     virtual void BrightnessIncrease(BoardType board, float percent) = 0;
 
+    /*!
+     * @brief Undervoltage detected
+     * @param board current board
+     */
+    virtual void UnderVoltage(BoardType board) = 0;
+
+    /*!
+     * @brief HighTemperature detected
+     * @param board current board
+     */
+    virtual void TemperatureAlert(BoardType board) = 0;
+
 };

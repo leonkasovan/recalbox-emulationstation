@@ -17,6 +17,7 @@ class SwitchComponent;
 
 class GuiMenuGamelistGameOptions : public GuiMenuBase
                                  , private IOptionListComponent<String>
+                                 , private IOptionListComponent<Path>
                                  , private IOptionListComponent<GameGenres>
                                  , private ISwitchComponent
                                  , private IEditableComponent
@@ -32,6 +33,7 @@ class GuiMenuGamelistGameOptions : public GuiMenuBase
     enum class Components
     {
       Emulator,
+      Patch,
       Ratio,
       Favorite,
       Hidden,
@@ -60,6 +62,9 @@ class GuiMenuGamelistGameOptions : public GuiMenuBase
 
     //! Emulator/Core
     std::shared_ptr<OptionListComponent<String>> mEmulator;
+
+    //! sotpatching path
+    std::shared_ptr<OptionListComponent<Path>> mPath;
     //! Ratio
     std::shared_ptr<OptionListComponent<String>> mRatio;
     //! Name
@@ -84,6 +89,8 @@ class GuiMenuGamelistGameOptions : public GuiMenuBase
 
     //! Get emulator list
     std::vector<ListEntry<String>> GetEmulatorEntries();
+    //! Get available patch List
+    std::vector<ListEntry<Path>> GetPatchEntries();
     //! Get ratio list
     std::vector<ListEntry<String>> GetRatioEntries();
     //! Get rating list
@@ -96,6 +103,8 @@ class GuiMenuGamelistGameOptions : public GuiMenuBase
      */
 
     void OptionListComponentChanged(int id, int index, const String& value) override;
+
+    void OptionListComponentChanged(int id, int index, const Path& value) override;
 
     /*
      * IOptionListComponent<GameGenres> implementation
@@ -113,7 +122,7 @@ class GuiMenuGamelistGameOptions : public GuiMenuBase
      * IEditableComponent implementation
      */
 
-    void SwitchComponentChanged(int id, bool status) override;
+    void SwitchComponentChanged(int id, bool& status) override;
 
     /*
      * IRatingComponent implementation

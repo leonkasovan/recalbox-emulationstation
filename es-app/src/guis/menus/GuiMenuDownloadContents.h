@@ -25,6 +25,7 @@ class GuiMenuDownloadContents: public GuiMenuBase
       Joke,
     };
 
+    //! System manager reference
     SystemManager& mSystemManager;
 
     /*

@@ -32,8 +32,7 @@ void Log::Open(const char* filename)
   // Backup?
   if (mPath.Exists())
   {
-    Path backup(mPath);
-    backup.ChangeExtension(".backup");
+    Path backup(mPath.ChangeExtension(".backup"));
     if (!backup.Delete()) { printf("[Logs] Cannot remove old log!"); }
     if (!Path::Rename(mPath, backup)) { printf("[Logs] Cannot backup current log!"); }
   }

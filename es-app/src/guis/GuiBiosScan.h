@@ -10,6 +10,7 @@
 #include <components/TextListComponent.h>
 #include <components/BusyComponent.h>
 #include <systems/SystemManager.h>
+#include "components/TextScrollComponent.h"
 
 class GuiBiosScan : public Gui, public IBiosScanReporting
 {
@@ -55,9 +56,9 @@ class GuiBiosScan : public Gui, public IBiosScanReporting
     //! Text title
     std::shared_ptr<TextComponent> mTitle;
     //! Header
-    std::shared_ptr<TextComponent> mHeader;
+    std::shared_ptr<TextScrollComponent> mHeader;
     //! Footer
-    std::shared_ptr<TextComponent> mFooter;
+    std::shared_ptr<TextScrollComponent> mFooter;
     //! Bios list
     std::shared_ptr<TextListComponent<ListContext>> mList;
     //! Button grid
@@ -68,7 +69,7 @@ class GuiBiosScan : public Gui, public IBiosScanReporting
     //! Detail: System label
     std::shared_ptr<TextComponent> mDetailSystemLabel;
     //! Detail: System name
-    std::shared_ptr<TextComponent> mDetailSystemValue;
+    std::shared_ptr<TextScrollComponent> mDetailSystemValue;
     //! Detail: Core label
     std::shared_ptr<TextComponent> mDetailCoreLabel;
     //! Detail: Core names
@@ -76,21 +77,21 @@ class GuiBiosScan : public Gui, public IBiosScanReporting
     //! Detail: Path label
     std::shared_ptr<TextComponent> mDetailPathLabel;
     //! Detail: Path value
-    std::shared_ptr<TextComponent> mDetailPathValue;
+    std::shared_ptr<TextScrollComponent> mDetailPathValue;
     //! Detail: Mandatory label
-    std::shared_ptr<TextComponent> mDetailMandatoryLabel;
+    std::shared_ptr<TextScrollComponent> mDetailMandatoryLabel;
     //! Detail: Mandatory yes/no
     std::shared_ptr<TextComponent> mDetailMandatoryValue;
     //! Detail: Hash Must Match label
-    std::shared_ptr<TextComponent> mDetailHashMustMatchLabel;
+    std::shared_ptr<TextScrollComponent> mDetailHashMustMatchLabel;
     //! Detail: Hash Must Match yes/no
     std::shared_ptr<TextComponent> mDetailHashMustMatchValue;
     //! Detail: File found label
-    std::shared_ptr<TextComponent> mDetailFileFoundLabel;
+    std::shared_ptr<TextScrollComponent> mDetailFileFoundLabel;
     //! Detail: File found status
     std::shared_ptr<TextComponent> mDetailFileFoundValue;
     //! Detail: Hash is matching label
-    std::shared_ptr<TextComponent> mDetailHashIsMatchingLabel;
+    std::shared_ptr<TextScrollComponent> mDetailHashIsMatchingLabel;
     //! Detail: Hash is matching status
     std::shared_ptr<TextComponent> mDetailHashIsMatchingValue;
     //! Detail: Free text 1 label (core list)
@@ -100,7 +101,7 @@ class GuiBiosScan : public Gui, public IBiosScanReporting
     //! Detail: Free text 1 value (remark / core list)
     std::shared_ptr<TextComponent> mDetailText1Value;
     //! Detail: Free text 2 label (note / core list 2)
-    std::shared_ptr<TextComponent> mDetailText2Label;
+    std::shared_ptr<TextScrollComponent> mDetailText2Label;
     //! Detail: Free text 2 value container
     std::shared_ptr<ScrollableContainer> mDetailText2ValueContainer;
     //! Detail: Free text 2 value (note / core list 2)

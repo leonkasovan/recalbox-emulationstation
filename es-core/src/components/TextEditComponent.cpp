@@ -189,8 +189,8 @@ void TextEditComponent::moveCursor(int amt)
 
 void TextEditComponent::setCursor(size_t pos)
 {
-	if(pos == String::npos)
-		mCursor = mText.length();
+	if (pos > mText.length())
+		mCursor = (int)mText.length();
 	else
 		mCursor = (int)pos;
 

@@ -1,7 +1,14 @@
 #include "InputDevice.h"
 #include "InputEvent.h"
+#include "utils/udev/UDevDevice.h"
+#include "utils/udev/UDev.h"
+#include "utils/udev/UDevEnumerate.h"
 #include <utils/String.h>
 #include <SDL2/SDL.h>
+#include <linux/input.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <utils/Files.h>
 
 unsigned int InputDevice::mReferenceTimes[32];
 
@@ -85,6 +92,8 @@ InputDevice::InputDevice(SDL_Joystick* device, SDL_JoystickID deviceId, int devi
   : mDeviceName(deviceName)
   , mDeviceGUID(deviceGUID)
   , mDeviceSDL(device)
+  , mLastTimeBatteryCheck(0)
+  , mBatteryLevel(0)
   , mDeviceId(deviceId)
   , mDeviceIndex(deviceIndex)
   , mDeviceNbAxes(deviceNbAxes)
@@ -94,20 +103,29 @@ InputDevice::InputDevice(SDL_Joystick* device, SDL_JoystickID deviceId, int devi
   , mPreviousHatsValues { 0 }
   , mPreviousAxisValues { 0 }
   , mNeutralAxisValues { 0 }
+  , mBatteryCharging(false)
+  , mIsATruePad(false)
   , mConfiguring(false)
   , mHotkeyState(false)
   , mKillSelect(false)
 {
+  #ifdef SDL_JOYSTICK_IS_OVERRIDEN_BY_RECALBOX
+  mPath = SDL_JoystickDevicePathById(deviceIndex);
+  #else
+    #ifdef _RECALBOX_PRODUCTION_BUILD_
+      #pragma GCC error "SDL_JOYSTICK_IS_OVERRIDEN_BY_RECALBOX undefined in production build!"
+    #endif
+    mPath = LookupPath();
+  #endif
+
+  mUDevDeviceName = UDevString(deviceIndex, UDevInfo::LowlevelName); // Default SDL2 name
+  mUDevUniqID = UDevString(deviceIndex, UDevInfo::UniqueID);
+  mUDevPowerPath = Path(UDevString(deviceIndex, UDevInfo::PowerPath));
+
   memset(mPreviousAxisValues, 0, sizeof(mPreviousAxisValues));
   memset(mPreviousHatsValues, 0, sizeof(mPreviousHatsValues));
 
-  // Fill neutral values
-  for(int i = deviceNbAxes; --i >= 0;)
-  {
-    Sint16 state = 0;
-    if (SDL_JoystickGetAxisInitialState(device, i, &state) == SDL_TRUE)
-      mNeutralAxisValues[i] = state < -sJoystickDeadZone ? -1 : (state > sJoystickDeadZone ? 1 : 0);
-  }
+  RecordAxisNeutralPosition();
 }
 
 void InputDevice::ClearAll()
@@ -122,44 +140,42 @@ void InputDevice::LoadFrom(const InputDevice& source)
   *this = source;
 }
 
-String InputDevice::NameExtented() const
+String InputDevice::NameExtented()
 {
-  String result(mDeviceName);
-  String powerLevel = PowerLevel();
-  if (!powerLevel.empty())
-    result.Append(' ').Append(powerLevel);
+  String result(Name());
+  String::Unicode powerLevel = BatteryLevelIcon();
+  if (powerLevel != 0)
+    result.Append(' ').AppendUTF8(powerLevel);
   return result;
 }
 
-String InputDevice::PowerLevel() const
+int InputDevice::BatteryLevel()
 {
-  if (mDeviceSDL != nullptr)
+  if (!mUDevPowerPath.IsEmpty())
   {
-    SDL_JoystickPowerLevel power = SDL_JoystickCurrentPowerLevel(mDeviceSDL);
-    switch (power)
+    if (int now = (int)SDL_GetTicks(); now - mLastTimeBatteryCheck > 10000)
     {
-      case SDL_JOYSTICK_POWER_UNKNOWN: return "";
-      case SDL_JOYSTICK_POWER_EMPTY:   return "\uF1b5";
-      case SDL_JOYSTICK_POWER_LOW:     return "\uF1b1";
-      case SDL_JOYSTICK_POWER_MEDIUM:  return "\uF1b8";
-      case SDL_JOYSTICK_POWER_FULL:    return "\uF1b7";
-      case SDL_JOYSTICK_POWER_MAX:     return "\uF1ba";
-      case SDL_JOYSTICK_POWER_WIRED:   return "\uF1b4";
-      default: break;
+      mLastTimeBatteryCheck = now;
+      mBatteryCharging = Files::LoadFile(mUDevPowerPath / "status").Trim() == "Charging";
+      int level = 0;
+      if (Files::LoadFile(mUDevPowerPath / "capacity").Trim().TryAsInt(level)) return mBatteryLevel = level;
     }
+    return mBatteryLevel;
   }
-  return "";
+  return -1; // Unknown / unavailable
 }
 
-/*String InputDevice::getSysPowerLevel()
+String::Unicode InputDevice::BatteryLevelIcon()
 {
-  SDL_Joystick* joy;
-  //joy = InputManager::getInstance()->getJoystickByJoystickID(getDeviceId());
-  joy = SDL_JoystickOpen(getDeviceId());
-  (void)joy; // TO-DO: Check usefulness
-  return "\uF1be";
+  if (mBatteryCharging) return 0xF1b4; // in charge
+  int level = BatteryLevel();
+  if (level <    0) return 0;      // Unknown / Wired
+  if (level == 100) return 0xF1ba; // Max
+  if (level >   80) return 0xF1b7; // Full
+  if (level >   40) return 0xF1b8; // Medium
+  if (level >   15) return 0xF1b1; // Low
+  return 0xF1b5;                   // Empty!
 }
-*/
 
 void InputDevice::Set(Entry input, InputEvent event)
 {
@@ -196,6 +212,8 @@ bool InputDevice::IsMatching(Entry input, InputEvent event) const
         case InputEvent::EventType::Key: return true;
         case InputEvent::EventType::Hat: return (event.Value() == 0 || ((event.Value() & comp.Value()) != 0));
         case InputEvent::EventType::Axis: return event.Value() == 0 || comp.Value() == event.Value();
+        case InputEvent::EventType::MouseWheel:
+        case InputEvent::EventType::MouseButton:
         case InputEvent::EventType::Unknown:
         default: break;
       }
@@ -553,7 +571,7 @@ int InputDevice::ConvertAxisToOnOff(int axis, int value, InputCompactEvent::Entr
           // the joystick is inverted.
           // Note: values are already normalized to -1/0/+1
           value = (config.Value() > 0) ? -value : value;
-          int previousValue = (config.Value() > 0) ? -mPreviousAxisValues[axis] : mPreviousAxisValues[axis];
+          int previousValue = mPreviousAxisValues[axis];
           if (previousValue != value)
           switch(value)
           {
@@ -586,6 +604,32 @@ int InputDevice::ConvertAxisToOnOff(int axis, int value, InputCompactEvent::Entr
   return elapsed;
 }
 
+int InputDevice::ConvertMouseButtonToOnOff(int button, bool pressed, InputCompactEvent::Entry& on,
+                                           InputCompactEvent::Entry& off)
+{
+  int elapsed = 0;
+  for (int i = (int)Entry::__Count; --i >= 0; )
+    if ((mConfigurationBits & (1 << (int)i)) != 0)
+      if (const InputEvent& config = mInputEvents[i]; config.Type() == InputEvent::EventType::MouseButton)
+        if (config.Id() == button)
+          elapsed = SetEntry(ConvertEntry((Entry)i), pressed, on, off);
+  return elapsed;
+}
+
+int InputDevice::ConvertMouseWheelToOnOff(int wheel, int direction, InputCompactEvent::Entry& on,
+                                          InputCompactEvent::Entry& off)
+{
+  bool stop = (direction & 0x1) == 0;
+  if (stop) direction >>= 1;
+  int elapsed = 0;
+  for (int i = (int)Entry::__Count; --i >= 0; )
+    if ((mConfigurationBits & (1 << (int)i)) != 0)
+      if (const InputEvent& config = mInputEvents[i]; config.Type() == InputEvent::EventType::MouseWheel)
+        if (config.Id() == wheel)
+          if (config.Value() == direction)
+            elapsed = SetEntry(ConvertEntry((Entry)i), !stop, on, off);
+  return elapsed;
+}
 
 InputCompactEvent InputDevice::ConvertToCompact(const InputEvent& event)
 {
@@ -604,6 +648,8 @@ InputCompactEvent InputDevice::ConvertToCompact(const InputEvent& event)
     case InputEvent::EventType::Hat: elapsed = ConvertHatToOnOff(event.Id(), event.Value(), on, off); break;
     case InputEvent::EventType::Button: elapsed = ConvertButtonToOnOff(event.Id(), event.Value() != 0, on, off); break;
     case InputEvent::EventType::Key: elapsed = ConvertKeyToOnOff(event.Id(), event.Value() != 0, on, off); break;
+    case InputEvent::EventType::MouseButton: elapsed = ConvertMouseButtonToOnOff(event.Id(), event.Value() != 0, on, off); break;
+    case InputEvent::EventType::MouseWheel: elapsed = ConvertMouseWheelToOnOff(event.Id(), event.Value(), on, off); break;
     case InputEvent::EventType::Unknown:
     default: { LOG(LogError) << "[InputDevice] Abnormal InputEvent::EventType: " << (int)event.Type(); break; }
   }
@@ -695,7 +741,7 @@ bool InputDevice::CheckNeutralPosition() const
     if (SDL_JoystickGetHat(mDeviceSDL, i) != 0)
       return false;
   // Check axis
-  for(int i = mDeviceNbHats; --i >= 0; )
+  for(int i = mDeviceNbAxes; --i >= 0; )
   {
     int axis = SDL_JoystickGetAxis(mDeviceSDL, i);
     axis = axis < -sJoystickDeadZone ? -1 : (axis > sJoystickDeadZone ? 1 : 0);
@@ -704,3 +750,114 @@ bool InputDevice::CheckNeutralPosition() const
   }
   return true;
 }
+
+String InputDevice::UDevString(int index, UDevInfo info)
+{
+  if (index >= 0)
+  {
+    UDev udev;
+    UDevEnumerate::DeviceList list = UDevEnumerate(udev).MatchSysname(mPath.Filename()).List();
+    if (list.size() == 1)
+    {
+      const UDevDevice& device = list[0];
+      mIsATruePad = device.Property("ID_INPUT_JOYSTICK") == "1";
+      switch(info)
+      {
+        case UDevInfo::LowlevelName:
+        {
+          //! ID_VENDOR_ENC + ID_MODEL_ENC for bluetooth pads
+          if (device.Property("ID_BUS") == "bluetooth")
+          {
+            String vendor(device.PropertyDecode("ID_VENDOR_ENC"));
+            String model(device.PropertyDecode("ID_MODEL_ENC"));
+            if (!model.Trim().empty())
+            {
+              if (!vendor.Trim().empty()) model.Insert(0, ' ').Insert(0, vendor);
+              if (!model.Trim().empty()) return model;
+            }
+          }
+          //! ATTRS{name} for all others
+          String name(device.Parent().Sysattr("name"));
+          if (!name.empty()) return name;
+
+          // Default: SDL2 name
+          return mDeviceName;
+        }
+        case UDevInfo::UniqueID:
+        {
+          String uniq(device.Parent().Sysattr("uniq"));
+          return uniq;
+        }
+        case UDevInfo::PowerPath:
+        {
+          // mUDevUniqueID must have been filled before - don't reorder the inits!
+          for(const Path& path : Path("/sys/class/power_supply").GetDirectoryContent())
+            if (path.IsDirectory())
+              if (path.ToString().EndsWith(mUDevUniqID))
+                return path.ToString();
+          break;
+        }
+        default: return String::Empty;
+      }
+    }
+    else { LOG(LogError) << "[InputDevice] Cannot get udev info " << (int)info <<" for pad index " << index; }
+  }
+  return "";
+}
+
+void InputDevice::RecordAxisNeutralPosition()
+{
+  // Fill neutral values
+  for (int i = mDeviceNbAxes; --i >= 0;)
+  {
+    Sint16 state = 0;
+    if (SDL_JoystickGetAxisInitialState(mDeviceSDL, i, &state) == SDL_TRUE)
+      mNeutralAxisValues[i] = state < -sJoystickDeadZone ? -1 : (state > sJoystickDeadZone ? 1 : 0);
+  }
+}
+
+#ifndef SDL_JOYSTICK_IS_OVERRIDEN_BY_RECALBOX
+Path InputDevice::LookupPath()
+{
+  UDev udev;
+  for(int i = 0; i < 64; ++i)
+  {
+    // Build path
+    Path devicePath(String("/dev/input/event").Append(i));
+    if (!devicePath.Exists()) continue;
+    // Lookup udev device
+    UDevEnumerate::DeviceList list = UDevEnumerate(udev).MatchSysname(Path(devicePath).Filename()).List();
+    if (list.empty()) continue;
+    // Get device
+    const UDevDevice& device = list[0];
+    // Is it a true pad?
+    if (device.Property("ID_INPUT_JOYSTICK") != "1") continue;
+    // Get first parent
+    const UDevDevice& parent = device.Parent();
+    // Extract IDs used in SDL2 GUID
+    int busType = String('$').Append(parent.Sysattr("id/bustype")).AsInt();
+    int product = String('$').Append(parent.Sysattr("id/product")).AsInt();
+    int vendor  = String('$').Append(parent.Sysattr("id/vendor")).AsInt();
+    int version = String('$').Append(parent.Sysattr("id/version")).AsInt();
+    // Build GUIDs - use a 4 little indian 32bits int for comparison, masked to use only LSW
+    union InternalGUID
+    {
+      SDL_JoystickGUID Sdl;
+      int Native[4];
+    };
+    InternalGUID Sdl { .Sdl = mDeviceGUID };
+    InternalGUID Dev { .Native { busType, vendor, product, version } };
+    // Compare
+    bool match = true;
+    for(int n = (int)(sizeof(InternalGUID::Native) / sizeof(InternalGUID::Native[0])); --n >= 0;)
+      if ((Sdl.Native[n] & 0xFFFF) != (Dev.Native[n] & 0xFFFF))
+      {
+        match = false;
+        break;
+      }
+    if (match) return devicePath;
+  }
+  { LOG(LogError) << "[InputDevice] Cannot lookup device path for pad " << Name(); }
+  return Path::Empty;
+}
+#endif

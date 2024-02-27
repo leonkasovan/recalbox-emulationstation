@@ -61,4 +61,6 @@ class IAudioController
 
     virtual void DisableNotification() = 0;
     virtual void EnableNotification() = 0;
+
+    virtual void SetOutputPort(const String) = 0;
 };

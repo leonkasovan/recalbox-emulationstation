@@ -129,4 +129,10 @@ class PcComputers: public IBoardInterface
      * @brief Set the CPU governor for EmulationStation
      */
     void SetFrontendCPUGovernor() final;
+
+    /*!
+    * @brief Has vulkan support
+    */
+    bool HasVulkanSupport() final
+    { return true; }
 };

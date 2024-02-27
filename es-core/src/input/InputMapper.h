@@ -11,58 +11,83 @@
 #include <input/Input.h>
 #include <input/IInputChange.h>
 #include <utils/math/Misc.h>
+#include <utils/os/fs/Path.h>
+#include "utils/cplusplus/INoCopy.h"
 
-class InputMapper : IInputChange
+// Forward declaration
+class InputManager;
+
+class InputMapper : public IInputChange
+                  , public INoCopy
 {
   public:
     //! Pad structure
     struct Pad
     {
-      String Name; //!< Real pad name
-      String UUID; //!< Pad uuid
-      int Identifier;   //!< Incremental index for multiple same pads
+      String mName;     //!< Real pad name
+      String mUUID;     //!< Pad uuid
+      Path   mPath;     //! /dev/input/eventX
+      int    mIndex;    //!< Pad index in InputManager list
+      int    mPosition; //!< Position in the mapper array
 
-      Pad() : Identifier(-1) {}
+      Pad() : mIndex(-1), mPosition(-1) {}
 
-      Pad(const String& name, const String& uuid, int index)
-        : Name(name)
-        , UUID(uuid)
-        , Identifier(index)
+      Pad(const String& name, const String& uuid, const Path& path, int inputIndex)
+        : mName(name)
+        , mUUID(uuid)
+        , mPath(path)
+        , mIndex(inputIndex)
+        , mPosition(-1)
       {
       }
 
-      void Set(const String& name, const String& uuid, int index)
+      void Set(const String& name, const String& uuid, const Path& path, int inputIndex)
       {
-        Name = name;
-        UUID = uuid;
-        Identifier = index;
+        mName = name;
+        mUUID = uuid;
+        mPath = path;
+        mIndex = inputIndex;
+        mPosition = -1;
       }
 
       void Reset()
       {
-        Name.clear();
-        UUID.clear();
-        Identifier = -1;
+        mName.clear();
+        mUUID.clear();
+        mPath = Path();
+        mIndex = -1;
+        mPosition = -1;
       }
 
-      [[nodiscard]] bool IsValid() const { return !Name.empty() && !UUID.empty(); }
+      [[nodiscard]] String LookupPowerLevel() const;
 
-      [[nodiscard]] bool IsConnected() const { return !Name.empty() && !UUID.empty() && Identifier >= 0; }
+      [[nodiscard]] bool IsValid() const { return !mName.empty() && !mUUID.empty(); }
+
+      [[nodiscard]] bool IsConnected() const { return !mName.empty() && !mUUID.empty() && mIndex >= 0; }
 
       [[nodiscard]] bool Equals(const Pad& to) const
       {
-        return Name == to.Name &&
-               UUID == to.UUID &&
-               Identifier == to.Identifier;
+        return mName == to.mName &&
+               mUUID == to.mUUID &&
+               mIndex == to.mIndex;
       }
 
       [[nodiscard]] bool Same(const Pad& than) const
       {
-        return Name == than.Name &&
-               UUID == than.UUID;
+        return mName == than.mName &&
+               mUUID == than.mUUID;
       }
 
-      [[nodiscard]] String AsString() const { return String(Name).Append('.').Append(UUID).Append('.').Append(Identifier); }
+      [[nodiscard]] String AsString() const { return String(mName).Append('.').Append(mUUID).Append('.').Append(mIndex); }
+
+      void Copy(const Pad& source)
+      {
+        mName = source.mName;
+        mUUID = source.mUUID;
+        mPath = source.mPath;
+        mIndex = source.mIndex;
+        mPosition = source.mPosition;
+      }
     };
 
     //! Pad array
@@ -71,7 +96,7 @@ class InputMapper : IInputChange
     typedef std::vector<Pad> PadList;
 
     //! Constructor
-    explicit InputMapper(IInputChange* interface);
+    InputMapper() = default;
 
     //! Destructor
     virtual ~InputMapper();
@@ -85,25 +110,10 @@ class InputMapper : IInputChange
     String GetDecoratedName(int index);
 
     /*!
-     * @brief Lookup the given pad in the connected list
-     * @param pad Pad to lookup
-     * @return Pad index or -1 if not found
+     * @brief Get all connected pads in a compact list (no unconnected pads)
+     * @return Connected pad list
      */
-    int LookupConnectedDevice(const Pad& pad) { return LookupDevice(mConnected, pad); }
-
-    /*!
-     * @brief Lookup the given pad in the unconnected list
-     * @param pad Pad to lookup
-     * @return Pad index or -1 if not found
-     */
-    int LookupUnconnectedDevice(const Pad& pad)  { return LookupDevice(mUnconnected, pad); }
-
-    /*!
-     * @brief Get pat at the given index
-     * @param index Index to retrieve the pad at
-     * @return Pad
-     */
-    [[nodiscard]] const Pad& PadAt(int index) const { return mPads[Math::clampi(index, 0, Input::sMaxInputDevices - 1)]; }
+    [[nodiscard]] PadList GetPads() const;
 
     /*!
      * @brief Swap pads at the given positions
@@ -112,16 +122,19 @@ class InputMapper : IInputChange
      */
     void Swap(int index1, int index2);
 
+    //! Get connected pad count
+    [[nodiscard]] int ConnectedPadCount() const;
+
+    /*!
+     * @brief Get real pad index (not included disconnected pads) from its identifier
+     * @param identifier Device identifier
+     * @return Index from 0 to X, or -1 if he device is unknown
+     */
+    int PadIndexFromDeviceIdentifier(int identifier);
+
   private:
     //! Pad array
     PadArray mPads;
-    //! Connected pad list
-    PadList mConnected;
-    //! Unconnected pad list
-    PadList mUnconnected;
-
-    //! Interface
-    IInputChange* mInterface;
 
     //! Rebuid the pad array, ready to be used
     void Build();
@@ -139,37 +152,15 @@ class InputMapper : IInputChange
     //! Get available pad list
     static PadList AvailablePads();
 
-    /*!
-     * @brief Sort pads, pushing active ones first
-     * This sort does not change the order of active pads
-     * @param list List to sort
-     */
-    static void SortActiveFirst(PadArray& padArray);
-
-    /*!
-     * @brief Lookup the given pad in the given connected pad list and returns its identifier
-     * @param list List to lookup pad
-     * @param pad Pad to lookup
-     * @return Device identifier or -1 if not found
-     */
-    static int LookupDevice(const PadList& list, const Pad& pad);
-
-    /*!
-     * @brief Lookup the given pad in the given connected pad list
-     * If found, the connected device is removed from the connected list
-     * and its identifier is returned.
-     * @param list List to lookup pad
-     * @param pad Pad to lookup
-     * @return Device identifier or -1 if not found
-     */
-    static int LookupAndPopDevice(PadList& list, const Pad& pad);
+    // Assign each pad a position in the mapper list
+    void AssignPositions();
 
     /*
      * IInputChange implementation
      */
 
     //! Refresh pad list
-    void PadsAddedOrRemoved() override;
+    void PadsAddedOrRemoved(bool removed) override;
 };
 
 

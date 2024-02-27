@@ -12,11 +12,13 @@ class InputEvent
     //! Event type
     enum class EventType: int
     {
-      Unknown, //!< Unknown/Not initialized event
-      Axis,    //!< Analog axis with values from -32768 to +32767
-      Button,  //!< Button with binary state
-      Hat,     //!< DPAD bitflag
-      Key,     //!< Keyboard key
+      Unknown,     //!< Unknown/Not initialized event
+      Axis,        //!< Analog axis with values from -32768 to +32767
+      Button,      //!< Button with binary state
+      Hat,         //!< DPAD bitflag
+      Key,         //!< Keyboard key
+      MouseButton, //!< Mouse button
+      MouseWheel,  //!< Mouse wheel
     };
 
   private:
@@ -28,11 +30,11 @@ class InputEvent
 
   public:
     //! Define virtual default mousse device
-    static constexpr int sMousseDevice = 0;
+    static constexpr int sMouseDevice = -1;
     //! Define virtual default keyboard device
-    static constexpr int sKeyboardDevice = -1;
+    static constexpr int sKeyboardDevice = -2;
     //! Define empty device device
-    static constexpr int sEmptyDevice = -2;
+    static constexpr int sEmptyDevice = -3;
 
     /*!
      * @brief Default constructor

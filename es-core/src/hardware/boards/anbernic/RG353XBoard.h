@@ -180,6 +180,12 @@ class RG353XBoard: public IBoardInterface
      * @return the rotation capabilities for tate mode
      */
     const RotationCapability GetRotationCapabilities() const override;
+
+    /*!
+    * @brief Has vulkan support
+    */
+    bool HasVulkanSupport() final
+    { return false; }
 };
 
 

@@ -6,7 +6,6 @@
 #include <mqtt/IMQTTMessageReceived.h>
 #include <mqtt/MqttClient.h>
 #include "DeviceStatus.h"
-#include "BluetoothOverlayGUI.h"
 #include "IBluetoothDeviceStatusListener.h"
 
 class BluetoothListener

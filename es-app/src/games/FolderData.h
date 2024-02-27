@@ -369,6 +369,13 @@ class FolderData : public FileData
     [[nodiscard]] bool HasMissingHashRecursively();
 
     /*!
+     * @brief Check if at least one game in the recursive tree satisfy the given filter
+     * @param filter Filter to cgeck games against
+     * @return True if at least one game satisfy the filter, false otherwise
+     */
+    [[nodiscard]] bool HasFilteredItemsRecursively(IFilter* filter) const;
+
+    /*!
      * @brief Compute all missing hashes recursively
      */
     void CalculateMissingHashRecursively();

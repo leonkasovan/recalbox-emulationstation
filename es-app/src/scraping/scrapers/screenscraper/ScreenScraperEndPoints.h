@@ -62,12 +62,12 @@ class ScreenScraperEndPoints : public IEndPointProvider
      */
     String GetGameInfoUrlByMD5(const String& login, const String& password, const FileData& game, const String& md5, long long size) override
     {
-      // (void)login;
-      // (void)password;
-      // (void)game;
-      // (void)md5;
-      // (void)size;
-      return GetGameInfoUrl(login, password, game, "", md5, size);
+      (void)login;
+      (void)password;
+      (void)game;
+      (void)md5;
+      (void)size;
+      return String();
     }
 
     /*!
@@ -82,12 +82,12 @@ class ScreenScraperEndPoints : public IEndPointProvider
      */
     String GetGameInfoUrlByName(const String& login, const String& password, const FileData& game, const String& md5, long long size) override
     {
-      // (void)login;
-      // (void)password;
-      // (void)game;
-      // (void)md5;
-      // (void)size;
-      return GetGameInfoUrl(login, password, game, "", md5, size);
+      (void)login;
+      (void)password;
+      (void)game;
+      (void)md5;
+      (void)size;
+      return String();
     }
 
     /*!

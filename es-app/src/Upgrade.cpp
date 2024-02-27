@@ -7,12 +7,15 @@
 
 #include <arpa/nameser.h>
 #include <resolv.h>
-#include "utils/network/Http.h"
+#include "utils/network/HttpClient.h"
 #include <utils/Files.h>
 #include "Upgrade.h"
 #include "RecalboxConf.h"
 #include "utils/locale/LocaleHelper.h"
 #include "recalbox/RecalboxSystem.h"
+#include "guis/GuiMsgBox.h"
+#include "guis/GuiMsgBoxScroll.h"
+#include "guis/GuiUpdateRecalbox.h"
 #include <patreon/PatronInfo.h>
 #include <guis/GuiInfoPopup.h>
 
@@ -46,11 +49,17 @@ void Upgrade::Run()
     int waitForSeconds = 15;
     while (IsRunning())
     {
-      if (mSignal.WaitSignal(waitForSeconds * 1000LL))
-        break;
+      if (mSignal.WaitSignal(waitForSeconds * 1000LL)) return;
 
       // Next checks, once an hour
       waitForSeconds = 3600;
+
+      // Wait for network being available
+      while(IsRunning())
+      {
+        if (mSignal.WaitSignal(5000LL)) return;
+        if (RecalboxSystem::hasIpAdress(false)) break;
+      }
 
       // Do we have to update?
       mRemoteVersion = GetRemoteVersion();
@@ -107,11 +116,17 @@ void Upgrade::Run()
 void Upgrade::ReceiveSyncMessage()
 {
   // Volatile popup
-  mWindow.InfoPopupAdd(new GuiInfoPopup(mWindow, mPopupMessage, PatronInfo::Instance().IsPatron() ? 10 : 10, PopupType::Recalbox));
+  mWindow.InfoPopupAdd(new GuiInfoPopup(mWindow, mPopupMessage, 10, PopupType::Recalbox));
 
   // Messagebox
   if (!mMessageBoxMessage.empty())
-    mWindow.displayScrollMessage(_("AN UPDATE IS AVAILABLE FOR YOUR RECALBOX"), mMessageBoxMessage, false);
+  {
+    //mWindow.displayScrollMessage(_("AN UPDATE IS AVAILABLE FOR YOUR RECALBOX"), mMessageBoxMessage, false);
+    Gui* gui = new GuiMsgBoxScroll(mWindow, _("AN UPDATE IS AVAILABLE FOR YOUR RECALBOX"), mMessageBoxMessage, _("LATER"), nullptr, _("UPDATE NOW"),
+                                   [this] { mWindow.pushGui(new GuiUpdateRecalbox(mWindow, TarUrl(), ImageUrl(), HashUrl(), NewVersion())); },
+                                   String::Empty, nullptr, TextAlignment::Left);
+    mWindow.pushGui(gui);
+  }
 }
 
 String Upgrade::GetDomainName()
@@ -124,7 +139,7 @@ String Upgrade::GetDomainName()
   if(target == "patron")
     target = "not-existing";
   // And if we are a patron, we can upgrade
-  if (PatronInfo::Instance().IsPatron() && target != "alpha")
+  if (PatronInfo::Instance().IsPatron() && target != "alpha" && target != "jamma")
     target = "patron";
   target.Remove(' ');
   String domain(target);
@@ -156,19 +171,16 @@ String Upgrade::GetRemoteVersion()
   String url = ReplaceMachineParameters(sVersionPatternUrl, String::Empty);
 
   String version;
-  Http request;
+  HttpClient request;
   for(int i = 3; --i >= 0; )
     if (request.Execute(url, version))
     {
       int returnCode = request.GetLastHttpResponseCode();
       if (returnCode == 200) break;  // Exit for
-      else if (returnCode >= 500 && returnCode <= 599) { Thread::Sleep(5000); continue; } // Next loop
-      else
-      {
-        { LOG(LogError) << "[Update] Error getting remote version: " << url << " - got: " << request.GetLastHttpResponseCode() ; }
-        version.clear();
-        break;
-      }
+      if (returnCode >= 500 && returnCode <= 599) { Thread::Sleep(5000); continue; } // Next loop
+      { LOG(LogError) << "[Update] Error getting remote version: " << url << " - got: " << request.GetLastHttpResponseCode() ; }
+      version.clear();
+      break;
     }
     else
     {
@@ -251,19 +263,16 @@ String Upgrade::GetRemoteReleaseVersion()
   String url = ReplaceMachineParameters(sReleasenotePatternUrl, String::Empty);
 
   String releaseNote;
-  Http request;
+  HttpClient request;
   for(int i = 3; --i >= 0; )
     if (request.Execute(url, releaseNote))
     {
       int returnCode = request.GetLastHttpResponseCode();
       if (returnCode == 200) break;  // Exit for
-      else if (returnCode >= 500 && returnCode <= 599) { Thread::Sleep(5000); continue; } // Next loop
-      else
-      {
-        { LOG(LogError) << "[Update] Error getting remote release note: " << url << " - got: " << request.GetLastHttpResponseCode() ; }
-        releaseNote.clear();
-        break;
-      }
+      if (returnCode >= 500 && returnCode <= 599) { Thread::Sleep(5000); continue; } // Next loop
+      { LOG(LogError) << "[Update] Error getting remote release note: " << url << " - got: " << request.GetLastHttpResponseCode() ; }
+      releaseNote.clear();
+      break;
     }
     else
     {

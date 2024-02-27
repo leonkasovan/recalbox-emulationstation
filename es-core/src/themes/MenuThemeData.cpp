@@ -174,5 +174,8 @@ MenuThemeData::MenuThemeData()
 
     if (elem->HasProperty("iconArcade"))
       mCurrent->menuIconSet.arcade = elem->AsString("iconArcade");
+
+    if (elem->HasProperty("iconDownload"))
+      mCurrent->menuIconSet.download = elem->AsString("iconDownload");
 	}
 }

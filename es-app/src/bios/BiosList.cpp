@@ -123,3 +123,17 @@ String BiosList::GenerateReport() const
   return report.empty() ? report : header + report;
 }
 
+bool BiosList::MoveStatus() const
+{
+  for(const Bios& bios : mBiosList)
+    if (bios.MoveStatus()) return true;
+  return false;
+}
+
+bool BiosList::MoveErrorStatus() const
+{
+  for(const Bios& bios : mBiosList)
+    if (bios.MoveErrorStatus()) return true;
+  return false;
+}
+

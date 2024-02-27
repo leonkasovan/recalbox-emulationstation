@@ -23,11 +23,11 @@ GuiMenuSoftpatchingLauncher::GuiMenuSoftpatchingLauncher(WindowManager& window,
     // select
     mPaths = AddList<Path>(_("select a patch"),(int) Components::Patch, this,GetPatchesEntries(), "");
 
-    mMenu.addButton(_("original"), "", [this, notifier] { Close(); if (notifier != nullptr) notifier->SoftPathingDisabled(); });
+    mMenu.addButton(_("original"), "", [this, notifier] { Close(); if (notifier != nullptr) mGame.Metadata().SetLastPatch(Path("original")); notifier->SoftPathingDisabled(); });
     mMenu.addButton(_("patched"),  "", [this, notifier] { Close(); if (notifier != nullptr) notifier->SoftPatchingSelected(mPaths->getSelected()); });
 
     mMenu.setCursorToButtons();
-    mMenu.SetDefaultButton(lastChoice);
+    mMenu.SetDefaultButton(mGame.Metadata().LastPatch() == Path("original") ? 0 :  lastChoice);
     GuiMenuBase::SetFooter(game.Name());
 }
 

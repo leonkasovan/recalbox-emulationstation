@@ -144,7 +144,8 @@ void ScraperSearchComponent::onSizeChanged()
 
   // Resize title & description
 	const float boxartCellScale = 0.9f;
-	mResultThumbnail->setMaxSize(mGrid.getColWidth(1) * boxartCellScale, mGrid.getRowHeight(1, 4) * boxartCellScale);
+	mResultThumbnail->setResize(mGrid.getColWidth(1) * boxartCellScale, mGrid.getRowHeight(1, 4) * boxartCellScale);
+  mResultThumbnail->setKeepRatio(true);
 	mDescContainer->setSize(mGrid.getColWidth(2, 5) * boxartCellScale, mGrid.getRowHeight(4, 5) * boxartCellScale);
 	mResultDesc->setSize(mDescContainer->getSize().x(), 0); // make desc text wrap at edge of container
 

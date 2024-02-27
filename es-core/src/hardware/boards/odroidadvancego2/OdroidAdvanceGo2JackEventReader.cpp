@@ -54,6 +54,14 @@ void OdroidAdvanceGo2JackEventReader::Run()
       continue;
     }
 
+    // query device for initial value
+    int initialValue;
+    if (ioctl(mFileHandle, EVIOCGSW(SW_HEADPHONE_INSERT), &initialValue) != -1) {
+      mSender.Send(BoardType::OdroidAdvanceGo, (bool)initialValue ? MessageTypes::HeadphonePluggedIn : MessageTypes::HeadphoneUnplugged);
+      { LOG(LogDebug) << "[OdroidAdvanceGo] Initial headphone status: " << ((bool)initialValue ? "plugged" : "unplugged"); }
+    }else
+      { LOG(LogDebug) << "[OdroidAdvanceGo] Initial headphone status: unknown"; }
+
     while(IsRunning())
     {
       // Poll

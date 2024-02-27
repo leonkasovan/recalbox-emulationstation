@@ -120,6 +120,11 @@ class Font : public IReloadable
     friend TextCache;
 
   public:
+    static Path sRecalboxIconPath; //!< Recalbox icons
+    static Path sDroidPath;        //!< japanese, chinese, korean
+    static Path sDejaVuPath;
+    static Path sUbuntuPath;
+
     static void initLibrary();
 
     static std::shared_ptr<Font> get(int size, const Path& path = getDefaultPath());

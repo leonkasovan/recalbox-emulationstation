@@ -4,7 +4,6 @@
 //
 
 #include "guis/menus/GuiMenuBase.h"
-#include "components/MenuComponent.h"
 #include "guis/GuiMetaDataEd.h"
 
 class ISimpleGameListView;
@@ -16,9 +15,7 @@ class GuiMenuGameFilters : public GuiMenuBase
     /*!
      * @brief Constructor
      */
-    GuiMenuGameFilters(WindowManager&window);
-
-    ~GuiMenuGameFilters() override;
+    GuiMenuGameFilters(WindowManager&window, SystemManager& systemManager);
 
   private:
     enum class Components
@@ -31,16 +28,14 @@ class GuiMenuGameFilters : public GuiMenuBase
       ShowOnlyLatestVersion,
     };
 
+    //! System manager reference
+    SystemManager& mSystemManager;
+
     std::shared_ptr<TextComponent> mGame;
 
     /*
      * ISwitchComponent implementation
      */
 
-    void SwitchComponentChanged(int id, bool status) override;
-
-    /*!
-    * @brief Manage all systems
-    */
-    void ManageSystems();
+    void SwitchComponentChanged(int id, bool& status) override;
 };

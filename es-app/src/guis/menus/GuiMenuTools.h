@@ -38,8 +38,20 @@ class GuiMenuTools
     typedef std::vector<EmulatorAndCore> EmulatorAndCoreList;
 
     /*!
+     * @brief Get a displayable list of emulator and core available for the given game
+     * @param game Game to retrieve emulators & cores from
+     * @param outDefaultEmulator Filled with default emeulator
+     * @param outDefaultCore Filled from default core
+     * @param currentEmulator Current emulator from caller (to select the right entry)
+     * @param currentCore Current core from caller (to select the right entry)
+     * @return Emulator & core list
+     */
+    static EmulatorAndCoreList ListGameEmulatorAndCore(FileData& game, String& outDefaultEmulator,
+                                                       String& outDefaultCore, const String& currentEmulator,
+                                                       const String& currentCore);
+
+    /*!
      * @brief Get a displayable list of emulator and core available for the given system
-     * @param systemManager System manager instance
      * @param system System to retrieve emulators & cores from
      * @param outDefaultEmulator Filled with default emeulator
      * @param outDefaultCore Filled from default core
@@ -47,7 +59,7 @@ class GuiMenuTools
      * @param currentCore Current core from caller (to select the right entry)
      * @return Emulator & core list
      */
-    static EmulatorAndCoreList ListEmulatorAndCore(SystemManager& systemManager, SystemData& system,
+    static EmulatorAndCoreList ListEmulatorAndCore(SystemData& system,
                                                    String& outDefaultEmulator, String& outDefaultCore,
                                                    const String& currentEmulator, const String& currentCore);
 

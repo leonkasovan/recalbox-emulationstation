@@ -2,7 +2,6 @@
 #include "systems/SystemData.h"
 #include "views/ViewController.h"
 
-#include "views/gamelist/DetailedGameListView.h"
 #include "views/gamelist/ArcadeGameListView.h"
 #include "guis/GuiDetectDevice.h"
 #include "animations/LaunchAnimation.h"
@@ -26,6 +25,7 @@ ViewController::ViewController(WindowManager& window, SystemManager& systemManag
   , mGameToLaunch(nullptr)
   , mLaunchCameraTarget()
   , mCheckFlags(LaunchCheckFlags::None)
+  , mForceGoToGame(false)
 	, mSystemManager(systemManager)
 	, mCurrentView(&mSplashView)
   , mCurrentSystem(nullptr)
@@ -38,11 +38,14 @@ ViewController::ViewController(WindowManager& window, SystemManager& systemManag
 	, mCamera(Transform4x4f::Identity())
 	, mFadeOpacity(0)
 	, mLockInput(false)
+  , mLastGameLaunched(0LL)
   , mFrequencyLastChoiceMulti60(0)
   , mFrequencyLastChoice(0)
   , mResolutionLastChoice(0)
   , mSuperGameboyLastChoice(0)
   , mSoftPatchingLastChoice(0)
+  , mSender(*this)
+  , mNextItem(nullptr)
 {
   // Set interfaces
   systemManager.SetProgressInterface(&mSplashView);
@@ -56,10 +59,16 @@ ViewController::ViewController(WindowManager& window, SystemManager& systemManag
   mSystemListView.setPosition(0, Renderer::Instance().DisplayHeightAsFloat());
   // Splash
   mSplashView.setPosition(0,0);
+
+  //! Centralized thread that process slow information for gamelists
+  Thread::Start("gamelist-slow");
 }
 
 ViewController::~ViewController()
 {
+  // Stop gamelist thread
+  Thread::Stop();
+
   for(const auto& view : mGameListViews)
     delete view.second;
 }
@@ -90,8 +99,9 @@ void ViewController::goToStart()
     else
     {
       mSystemListView.SetProgressInterface(&mSplashView);
-      goToSystemView(selectedSystem);
+      mSystemListView.populate();
       mSystemListView.SetProgressInterface(nullptr);
+      goToSystemView(selectedSystem);
     }
   }
 }
@@ -118,13 +128,8 @@ void ViewController::ResetFilters()
   conf.SetHideNoGames(false);
   conf.SetFilterAdultGames(false);
 
-  conf.SetCollectionHide("ports",false);
+  conf.SetCollectionPorts(true);
 //  MainRunner::RequestQuit(MainRunner::ExitState::Relaunch, true);
-}
-
-int ViewController::getSystemId(SystemData* system)
-{
-	return mSystemManager.VisibleSystemList().IndexOf(system);
 }
 
 void ViewController::goToQuitScreen()
@@ -137,7 +142,7 @@ void ViewController::goToQuitScreen()
 void ViewController::goToSystemView(SystemData* system)
 {
   CheckFilters();
-  mSystemListView.setPosition((float)getSystemId(system) * Renderer::Instance().DisplayWidthAsFloat(), mSystemListView.getPosition().y());
+  mSystemListView.setPosition((float)mSystemManager.SystemAbsoluteIndex(system) * Renderer::Instance().DisplayWidthAsFloat(), mSystemListView.getPosition().y());
 
   if (!system->HasVisibleGame()) {
     system = mSystemManager.FirstNonEmptySystem();
@@ -214,11 +219,11 @@ void ViewController::goToGameList(SystemData* system)
 	{
 		mWindow.Rotate(rotation);
 	}
-	if (mCurrentViewType == ViewType::SystemList)
+	if (mCurrentViewType != ViewType::GameList)
 	{
 		// move system list
 		float offX = mSystemListView.getPosition().x();
-		int sysId = getSystemId(system);
+		int sysId = mSystemManager.SystemAbsoluteIndex(system);
     mSystemListView.setPosition((float)sysId * Renderer::Instance().DisplayWidthAsFloat(), mSystemListView.getPosition().y());
 		offX = mSystemListView.getPosition().x() - offX;
 		mCamera.translation().x() -= offX;
@@ -311,8 +316,13 @@ void ViewController::playViewTransition()
 	}
 }
 
-void ViewController::Launch(FileData* game, const GameLinkedData& data, const Vector3f& cameraTarget)
+void ViewController::Launch(FileData* game, const GameLinkedData& data, const Vector3f& cameraTarget, bool forceGoToGame)
 {
+  // Avoid launch repeat
+  DateTime now;
+  if ((now - mLastGameLaunched).TotalMilliseconds() < 2000) return;
+  mLastGameLaunched = now;
+
   if (!game->IsGame())
   {
     { LOG(LogError) << "[ViewController] Tried to launch something that isn't a game"; }
@@ -323,6 +333,7 @@ void ViewController::Launch(FileData* game, const GameLinkedData& data, const Ve
   mGameToLaunch = game;
   mLaunchCameraTarget = cameraTarget;
   mCheckFlags = LaunchCheckFlags::None;
+  mForceGoToGame = forceGoToGame;
   LaunchCheck();
 }
 
@@ -332,7 +343,7 @@ bool ViewController::CheckBiosBeforeLaunch()
   if (biosList.TotalBiosKo() != 0)
   {
     // Build emulator name
-    EmulatorData emulator = mSystemManager.Emulators().GetGameEmulator(*mGameToLaunch);
+    EmulatorData emulator = EmulatorManager::GetGameEmulator(*mGameToLaunch);
     String emulatorString = emulator.Emulator();
     if (emulator.Emulator() != emulator.Core()) emulatorString.Append('/').Append(emulator.Core());
     // Build text
@@ -445,6 +456,23 @@ bool ViewController::CheckSoftPatching(const EmulatorData& emulator)
         }
         break;
       }
+      case RecalboxConf::SoftPatching::LaunchLast:
+      {
+        Path lastPatchPath = mGameToLaunch->Metadata().LastPatch();
+
+        if (lastPatchPath.Exists())
+        {
+          mGameLinkedData.ConfigurablePatch().SetPatchPath(lastPatchPath);
+          break;
+        }
+        else if (lastPatchPath.Filename() == "original")
+        {
+          mGameLinkedData.ConfigurablePatch().SetDisabledSoftPatching(true);
+          break;
+        }
+        // if no patch are configured yet go to next SoftPatching::Select case
+        [[fallthrough]];
+      }
       case RecalboxConf::SoftPatching::Select:
       {
         std::vector<Path> patches = GameFilesUtils::GetSoftPatches(mGameToLaunch);
@@ -469,10 +497,13 @@ bool ViewController::CheckSoftPatching(const EmulatorData& emulator)
 
 void ViewController::LaunchCheck()
 {
-  EmulatorData emulator = mSystemManager.Emulators().GetGameEmulator(*mGameToLaunch);
+  EmulatorData emulator = EmulatorManager::GetGameEmulator(*mGameToLaunch);
   if (!emulator.IsValid())
   {
-    { LOG(LogError) << "[ViewController] Empty emulator/core when running " << mGameToLaunch->RomPath().ToString() << '!'; }
+    {
+      LOG(LogError) << "[ViewController] Empty emulator/core when running " << mGameToLaunch->RomPath().ToString()
+                    << '!';
+    }
     return;
   }
 
@@ -486,28 +517,49 @@ void ViewController::LaunchCheck()
     if (mCheckFlags |= LaunchCheckFlags::Frequency; mGameLinkedData.Crt().IsRegionOrStandardConfigured())
       if (mGameLinkedData.Crt().MustChoosePALorNTSC(mGameToLaunch->System()))
       {
-        if(mGameToLaunch->System().Name() == "megadrive")
-          mWindow.pushGui(new GuiFastMenuList(mWindow, this, _("Game refresh rate"), mGameToLaunch->Name(), (int)FastMenuType::FrequenciesMulti60,
-                                              { { _("AUTO") }, { _("60Hz (US)") }, { _("60Hz (JP)") }, { _("50Hz (EU)") } }, mFrequencyLastChoiceMulti60));
+        if (mGameToLaunch->System().Name() == "megadrive")
+          mWindow.pushGui(new GuiFastMenuList(mWindow, this, _("Game refresh rate"), mGameToLaunch->Name(),
+                                              (int) FastMenuType::FrequenciesMulti60,
+                                              {{_("AUTO")},
+                                               {_("60Hz (US)")},
+                                               {_("60Hz (JP)")},
+                                               {_("50Hz (EU)")}}, mFrequencyLastChoiceMulti60));
         else
-          mWindow.pushGui(new GuiFastMenuList(mWindow, this, _("Game refresh rate"), mGameToLaunch->Name(), (int)FastMenuType::Frequencies,
-                                              { { _("AUTO") }, { _("60Hz") }, { _("50Hz") } }, mFrequencyLastChoice));
+          mWindow.pushGui(new GuiFastMenuList(mWindow, this, _("Game refresh rate"), mGameToLaunch->Name(),
+                                              (int) FastMenuType::Frequencies,
+                                              {{_("AUTO")},
+                                               {_("60Hz")},
+                                               {_("50Hz")}}, mFrequencyLastChoice));
         return;
       }
 
   // CRT Resolution choice
   if ((mCheckFlags & LaunchCheckFlags::CrtResolution) == 0)
-    if (mCheckFlags |= LaunchCheckFlags::CrtResolution; mGameLinkedData.Crt().IsHighResolutionConfigured())
-      if (const bool is31Khz = Board::Instance().CrtBoard().GetHorizontalFrequency() == ICrtInterface::HorizontalFrequency::KHz31;
-          is31Khz || mGameLinkedData.Crt().MustChooseHighResolution(mGameToLaunch->System()))
+  {
+    if (mCheckFlags |= LaunchCheckFlags::CrtResolution; mGameLinkedData.Crt().IsResolutionSelectionConfigured())
+    {
+      const bool is31kHz = Board::Instance().CrtBoard().GetHorizontalFrequency() ==
+                           ICrtInterface::HorizontalFrequency::KHz31;
+      const bool supports120Hz = Board::Instance().CrtBoard().Has120HzSupport();
+      const bool isMultiSync = Board::Instance().CrtBoard().MultiSyncEnabled();
+      if (mGameLinkedData.Crt().MustChooseHighResolution(mGameToLaunch, emulator))
       {
-        mWindow.pushGui(new GuiFastMenuList(mWindow, this, _("Game resolution"), mGameToLaunch->Name(), (int)FastMenuType::CrtResolution,
-                                            { { is31Khz ? _("240p@120") : _("240p") }, { is31Khz ? _("480p@60") : _("480i") } }, mResolutionLastChoice));
+        mWindow.pushGui(new GuiFastMenuList(mWindow, this, _("Game resolution"), mGameToLaunch->Name(),
+                                            (int) FastMenuType::CrtResolution,
+                                            {{(is31kHz && supports120Hz) ? "240p@120" : "240p"},
+                                             {(is31kHz || isMultiSync) ? "480p" : "480i"}}, mResolutionLastChoice));
         return;
       }
+    }
+    else
+    {
+      mGameLinkedData.ConfigurableCrt().AutoConfigureHighResolution(mGameToLaunch->System());
+    }
+  }
 
-  if ((mCheckFlags & LaunchCheckFlags::CrtResolution) == 0)
-    if (mCheckFlags |= LaunchCheckFlags::CrtResolution; CheckSoftPatching(emulator))
+
+  if ((mCheckFlags & LaunchCheckFlags::SoftPatching) == 0)
+    if (mCheckFlags |= LaunchCheckFlags::SoftPatching; CheckSoftPatching(emulator))
       return;
 
   // SuperGameBoy choice
@@ -521,7 +573,7 @@ void ViewController::LaunchCheck()
 
   // Save state slot
   if ((mCheckFlags & LaunchCheckFlags::SaveState) == 0)
-    if (mCheckFlags |= LaunchCheckFlags::SaveState; mSystemManager.Emulators().GetGameEmulator(*mGameToLaunch).IsLibretro() && RecalboxConf::Instance().GetGlobalShowSaveStateBeforeRun())
+    if (mCheckFlags |= LaunchCheckFlags::SaveState; EmulatorManager::GetGameEmulator(*mGameToLaunch).IsLibretro() && RecalboxConf::Instance().GetGlobalShowSaveStateBeforeRun())
       if (!GameFilesUtils::GetGameSaveStateFiles(*mGameToLaunch).empty())
       {
         mWindow.pushGui(new GuiSaveStates(mWindow, mSystemManager, *mGameToLaunch, this, false));
@@ -535,6 +587,8 @@ void ViewController::LaunchActually(const EmulatorData& emulator)
 {
   DateTime start;
   GameRunner::Instance().RunGame(*mGameToLaunch, emulator, mGameLinkedData);
+  if (mForceGoToGame)
+    selectGamelistAndCursor(mGameToLaunch);
   TimeSpan elapsed = DateTime() - start;
 
   if (elapsed.TotalMilliseconds() <= 3000) // 3s
@@ -544,7 +598,6 @@ void ViewController::LaunchActually(const EmulatorData& emulator)
     // Show the dialog box
     Gui* gui = new GuiMsgBox(mWindow, text, _("OK"), TextAlignment::Left);
     mWindow.pushGui(gui);
-    return;
   }
 }
 
@@ -615,7 +668,7 @@ ISimpleGameListView* ViewController::GetOrCreateGamelistView(SystemData* system)
   view->Initialize();
 	view->setTheme(system->Theme());
 
-  int id = mSystemManager.VisibleSystemList().IndexOf(system);
+  int id = mSystemManager.SystemAbsoluteIndex(system);
 	view->setPosition((float)id * Renderer::Instance().DisplayWidthAsFloat(), Renderer::Instance().DisplayHeightAsFloat() * 2);
 
 	addChild(view);
@@ -860,23 +913,29 @@ void ViewController::BackToPreviousView()
   mPreviousViewType = ViewType::None; // Reset previous mode so that you cannot go back until next forward move
 }
 
+void ViewController::SelectSystem(SystemData* system)
+{
+  if (mCurrentViewType == ViewType::SystemList) mSystemListView.goToSystem(system, false);
+  else if (mCurrentViewType == ViewType::GameList) goToGameList(system);
+}
+
 void ViewController::ShowSystem(SystemData* system)
 {
-  GetOrCreateGamelistView(system);
   mSystemListView.addSystem(system);
+  mSystemListView.Sort();
+  InvalidateAllGamelistsExcept(nullptr);
+  GetOrCreateGamelistView(system);
 }
 
 void ViewController::HideSystem(SystemData* system)
 {
   // Remove system in system view
   mSystemListView.removeSystem(system);
-  //mSystemListView.goToSystem(system, false);
 
   // Are we on the gamelist that just need to be removed?
   if (isViewing(ViewType::GameList))
     if (&((ISimpleGameListView*)mCurrentView)->System() == system)
     {
-      //goToSystemView(&mSystemListView.CurrentSystem());
       SystemData* nextSystem = goToNextGameList();
       mSystemListView.goToSystem(nextSystem, false);
     }
@@ -885,6 +944,21 @@ void ViewController::HideSystem(SystemData* system)
 void ViewController::UpdateSystem(SystemData* system)
 {
   InvalidateGamelist(system);
+  // Force refresh if we're on this system's view
+  ISimpleGameListView** view = mGameListViews.try_get(system);
+  if (view != nullptr)
+    if (*view == mCurrentView)
+    {
+      int index = (*view)->getCursorIndex();
+      (*view)->refreshList();
+      (*view)->setCursorIndex(index);
+    }
+}
+
+void ViewController::SystemShownWithNoGames(SystemData* system)
+{
+  String text = (_F(_("System \"{0}\" has no visible game yet!\n\nIt will show up automatically as soon as it has visible games.")) / system->FullName()).ToString();
+  mWindow.InfoPopupAddRegular(text, 10, PopupType::Recalbox, false);
 }
 
 void ViewController::ToggleFavorite(FileData* game, bool forceStatus, bool forcedStatus)
@@ -903,3 +977,98 @@ void ViewController::ToggleFavorite(FileData* game, bool forceStatus, bool force
   String message = game->Metadata().Favorite() ? _("Added to favorites") : _("Removed from favorites");
   mWindow.InfoPopupAddRegular(message.Append(":\n").Append(game->Name()), RecalboxConf::Instance().GetPopupHelp(), PopupType::None, false);
 }
+
+void ViewController::Run()
+{
+  while(IsRunning())
+  {
+    mSignal.WaitSignal();
+    if (!IsRunning()) return; // Destructor called :)
+    for(bool working = true; working; )
+    {
+      mLocker.Lock();
+      const FileData* item = mNextItem;
+      mNextItem = nullptr;
+      mLocker.UnLock();
+      if (item == nullptr) working = false;
+      else if (item->IsFolder())
+      {
+        FolderData* folder = (FolderData*)item;
+        int count = folder->CountAll(false, folder->System().Excludes());
+
+        class Filter : public IFilter
+        {
+          private:
+            Path mPath[sFoldersMaxGameImageCount];
+            int mCount;
+
+          public:
+            Filter() : mCount(0) {}
+
+            bool ApplyFilter(const FileData& file) override
+            {
+              if (mCount < sFoldersMaxGameImageCount)
+                if (file.HasThumbnailOrImage())
+                  mPath[mCount++] = file.ThumbnailOrImagePath();
+              return false;
+            }
+
+            Path& GetPath(int index) { return mPath[index]; }
+        } filter;
+        folder->CountFilteredItemsRecursively(&filter, false);
+
+        // Store results
+        mLocker.Lock();
+        for(int i = sFoldersMaxGameImageCount; --i >= 0;)
+          mLastFolderImagePath[i] = std::move(filter.GetPath(i));
+        mLocker.UnLock();
+        mSender.Send({ item, count, false, &mLastFolderImagePath });
+      }
+      else if (item->IsGame())
+      {
+        if (item->HasP2K()) // Send message only if p2k is available
+          mSender.Send({ item, 0, true, &mLastFolderImagePath } );
+      }
+    }
+  }
+}
+
+void ViewController::ReceiveSyncMessage(const SlowDataInformation& data)
+{
+  if (mCurrentViewType == ViewType::GameList)
+    ((ISimpleGameListView*)mCurrentView)->UpdateSlowData(data);
+}
+
+void ViewController::FetchSlowDataFor(FileData* data)
+{
+  Mutex::AutoLock locker(mLocker);
+  mNextItem = data;
+  mSignal.Fire();
+}
+
+void ViewController::RequestSlowOperation(ISlowSystemOperation* interface, ISlowSystemOperation::List systems, bool autoSelectMonoSystem)
+{
+  String text = systems.Count() > 1 ?
+                _("INITIALIZING SYSTEMS...") :
+                (_F(_("INITIALIZING SYSTEM {0}")) / systems.First()->FullName()).ToString();
+  auto* gui = new GuiWaitLongExecution<DelayedSystemOperationData, bool>(mWindow, *this);
+  gui->Execute({ std::move(systems), interface, autoSelectMonoSystem }, text);
+  mWindow.pushGui(gui);
+}
+
+bool ViewController::Execute(GuiWaitLongExecution<DelayedSystemOperationData, bool>& from,
+                             const DelayedSystemOperationData& parameter)
+{
+  (void)from;
+  if (parameter.mSlowIMethodInterface != nullptr)
+    parameter.mSlowIMethodInterface->SlowPopulateExecute(parameter.mSystemList);
+  return true;
+}
+
+void ViewController::Completed(const DelayedSystemOperationData& parameter, const bool& result)
+{
+  (void)result;
+  if (parameter.mSlowIMethodInterface != nullptr)
+    parameter.mSlowIMethodInterface->SlowPopulateCompleted(parameter.mSystemList, parameter.autoSelectMonoSystem);
+}
+

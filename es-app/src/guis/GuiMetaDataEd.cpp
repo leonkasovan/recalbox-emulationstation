@@ -137,16 +137,16 @@ GuiMetaDataEd::GuiMetaDataEd(WindowManager& window,
           String currentCore = mMetaData.Core();
           String defaultEmulator;
           String defaultCore;
-          if (!mSystemManager.Emulators().GetDefaultEmulator(mGame.System(), defaultEmulator, defaultCore))
+          if (!EmulatorManager::GetDefaultEmulator(mGame.System(), defaultEmulator, defaultCore))
             continue;
           if (currentEmulator.empty()) currentEmulator = defaultEmulator;
           if (currentCore.empty()) currentCore = defaultCore;
 
           row.addElement(emu_choice, false);
 
-          for (const String& emulatorName : mSystemManager.Emulators().GetEmulators(mGame.System()))
+          for (const String& emulatorName : EmulatorManager::GetEmulators(mGame.System()))
           {
-            for (const String& coreName : mSystemManager.Emulators().GetCores(mGame.System(), emulatorName))
+            for (const String& coreName : EmulatorManager::GetCores(mGame.System(), emulatorName))
             {
               String displayName = emulatorName;
               if (displayName != coreName) displayName.Append(' ').Append(coreName);
@@ -368,7 +368,7 @@ void GuiMetaDataEd::save()
         {
           String defaultEmulator;
           String defaultCore;
-          mSystemManager.Emulators().GetDefaultEmulator(mGame.System(), defaultEmulator, defaultCore);
+          EmulatorManager::GetDefaultEmulator(mGame.System(), defaultEmulator, defaultCore);
           if (split[0] == defaultEmulator && split[1] == defaultCore)
           {
             mMetaData.SetEmulator("");
@@ -420,28 +420,29 @@ void GuiMetaDataEd::close(bool closeAllWindows)
   bool dirty = false;
   for (int i = 0; i < (int)mEditors.size(); i++)
   {
-      // because mMetada do not contains default system emulator & core
-      if(mMetaDataEditable[i]->Key() == "emulator"){
-          String editorEmulatorCore = mEditors[i]->getValue();
+    // because mMetada do not contains default system emulator & core
+    if(mMetaDataEditable[i]->Key() == "emulator")
+    {
+      String editorEmulatorCore = mEditors[i]->getValue();
 
-          String metaEmulator = mMetaData.Emulator();
-          String metaCore = mMetaData.Core();
-          String metaEmulatorCore = metaEmulator;
-          metaEmulatorCore.Append(':').Append(metaCore);
+      String metaEmulator = mMetaData.Emulator();
+      String metaCore = mMetaData.Core();
+      String metaEmulatorCore = metaEmulator;
+      metaEmulatorCore.Append(':').Append(metaCore);
 
-          String defaultEmulator;
-          String defaultCore;
-          mSystemManager.Emulators().GetDefaultEmulator(mGame.System(), defaultEmulator, defaultCore);
-          String defaulEmulatorAndCore = defaultEmulator;
-          defaulEmulatorAndCore.Append(':').Append(defaultCore);
+      String defaultEmulator;
+      String defaultCore;
+      EmulatorManager::GetDefaultEmulator(mGame.System(), defaultEmulator, defaultCore);
+      String defaulEmulatorAndCore = defaultEmulator;
+      defaulEmulatorAndCore.Append(':').Append(defaultCore);
 
-          if(editorEmulatorCore != metaEmulatorCore && editorEmulatorCore != defaulEmulatorAndCore)
-          {
-              dirty = true;
-              break;
-          }
-          continue;
+      if(editorEmulatorCore != metaEmulatorCore && editorEmulatorCore != defaulEmulatorAndCore)
+      {
+        dirty = true;
+        break;
       }
+      continue;
+    }
 
     GetValueMethodType method = mMetaDataEditable[i]->GetValueMethod();
     if ((mMetaData.*method)() != mEditors[i]->getValue())

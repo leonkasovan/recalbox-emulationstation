@@ -2,9 +2,8 @@
 // Created by bkg2k on 30/10/2020.
 //
 
-#include "OdroidAdvanceGo2Board.h"
 #include <input/InputCompactEvent.h>
-#include <RecalboxConf.h>
+#include "OdroidAdvanceGo2Board.h"
 #include <utils/math/Misc.h>
 #include <utils/Files.h>
 #include <audio/AudioController.h>
@@ -28,7 +27,7 @@ bool OdroidAdvanceGo2Board::ProcessSpecialInputs(InputCompactEvent& inputEvent, 
     RecalboxConf::Instance().Save();
     return pressResult;
   }
-  else if (inputEvent.VolumeDownPressed())
+  if (inputEvent.VolumeDownPressed())
   {
     { LOG(LogDebug) << "[OdroidAdvanceGo] Volume - pressed"; }
     int value = RecalboxConf::Instance().GetAudioVolume() - 10;
@@ -39,7 +38,7 @@ bool OdroidAdvanceGo2Board::ProcessSpecialInputs(InputCompactEvent& inputEvent, 
     RecalboxConf::Instance().Save();
     return pressResult;
   }
-  else if (inputEvent.BrightnessUpPressed())
+  if (inputEvent.BrightnessUpPressed())
   {
     { LOG(LogDebug) << "[OdroidAdvanceGo] Brightness + pressed"; }
     int value = RecalboxConf::Instance().GetBrightness() + 1;
@@ -49,7 +48,7 @@ bool OdroidAdvanceGo2Board::ProcessSpecialInputs(InputCompactEvent& inputEvent, 
     RecalboxConf::Instance().Save();
     return pressResult;
   }
-  else if (inputEvent.BrightnessDownPressed())
+  if (inputEvent.BrightnessDownPressed())
   {
     { LOG(LogDebug) << "[OdroidAdvanceGo] Brightness - pressed"; }
     int value = RecalboxConf::Instance().GetBrightness() - 1;
@@ -125,12 +124,14 @@ bool OdroidAdvanceGo2Board::IsBatteryCharging()
 
 void OdroidAdvanceGo2Board::HeadphonePlugged()
 {
-  system("amixer sset 'Playback Path' HP");
+  if (system("amixer sset 'Playback Path' HP") != 0)
+  { LOG(LogError) << "[OdroidAdvanceGo2Board] Error setting headphone on!"; }
 }
 
 void OdroidAdvanceGo2Board::HeadphoneUnplugged()
 {
-  system("amixer sset 'Playback Path' SPK");
+  if (system("amixer sset 'Playback Path' SPK") != 0)
+  { LOG(LogError) << "[OdroidAdvanceGo2Board] Error setting headphone off!"; }
 }
 
 void OdroidAdvanceGo2Board::SetFrontendCPUGovernor()

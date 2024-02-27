@@ -9,17 +9,17 @@
 class ArcadeVirtualSystems
 {
   public:
-    static constexpr const char* sAllOtherDriver = "allothers";
+    static constexpr const char* sAllOtherManufacturers = "allothers";
+
     /*!
-     * @brief Return known list of arcade driver
+     * @brief Return top list of arcade manufacturer
      * @return Arcade driver list
      */
     static const String::List& GetVirtualArcadeSystemList();
 
     /*!
-     * @brief Get a friendly name from an arcade driver
-     * @param driverName Arcade driver
-     * @return Freindly name or driver name if no match is found
+     * @brief Return top list of arcade manufacturer, associated to their user-friendly names
+     * @return Arcade driver list
      */
-    static String GetRealName(const String& driverName);
+    static const std::vector<std::pair<String, String>>& GetVirtualArcadeSystemListExtended();
 };

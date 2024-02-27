@@ -88,13 +88,19 @@ class ArcadeDatabaseManager
     [[nodiscard]] bool IsEmpty() const { return mDatabases.empty(); }
 
   private:
-    //! Raw driver structure
-    struct RawDriver
+    //! Manufacturer limit
+    static constexpr int sManufacturerLimits = 21; // 20 + special all-remaining-manufacturers at index 0
+
+    //! Raw Manufacturer structure
+    struct RawManufacturer
     {
-      String mName;   //!< Driver name
-      int mIndex;     //!< Driver index
-      int mGameCount; //!< Game using this driver
+      String mName;   //!< Manufacturer name
+      int mIndex;     //!< Manufacturer index
+      int mGameCount; //!< Game from this Manufacturer
     };
+
+    //! Map type
+    typedef HashMap<String, RawManufacturer> ManufacturerMap;
 
     //! System reference
     SystemData& mSystem;
@@ -111,11 +117,11 @@ class ArcadeDatabaseManager
      * @param emulator Emulator name
      * @param core Core name
      * @param splitDriverString raw split driver string list
-     * @param ignoredDriverString raw ignored driver string list
+     * @param ignoredManufacturerString raw ignored driver string list
      * @result GameDatabase
      */
     ArcadeDatabase* LoadFlatDatabase(const String& emulator, const String& core, const String& databaseFilename,
-                                     const String& splitDriverString, const String& ignoredDriverString, int limit);
+                                     const String& ignoredManufacturerString);
 
     /*!
      * @brief Deserializea line into an ArcadeGame structure
@@ -126,8 +132,7 @@ class ArcadeDatabaseManager
      * @param nextDriverIndex next driver index
      */
     static void DeserializeTo(Array<ArcadeGame>& games, const String& line, const HashMap<String, FileData*>& map,
-                              HashMap<String, RawDriver>& drivers, const HashSet<String>& splitDrivers,
-                              const HashSet<String>& ignoreDrivers, int& nextDriverIndex);
+                              ManufacturerMap& manufacturerMap, const HashSet<String>& ignoreDrivers, int& nextDriverIndex);
 
     /*!
      * @brief Build final driver list & remap drivers in existing games
@@ -137,7 +142,7 @@ class ArcadeDatabaseManager
      * @param rawDriverCount raw driver count
      * @return Final driver list
      */
-    static ArcadeDatabase::DriverLists BuildAndRemapDrivers(const HashMap<String, RawDriver>& map, Array<ArcadeGame>& games, int limit, int rawDriverCount);
+    static ArcadeDatabase::ManufacturerLists BuildAndRemapManufacturers(const ManufacturerMap& map, Array<ArcadeGame>& games, int rawDriverCount);
 
     /*!
      * @brief Try to assign best matching names to unamed games

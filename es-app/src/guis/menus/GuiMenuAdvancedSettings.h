@@ -57,9 +57,11 @@ class GuiMenuAdvancedSettings : public GuiMenuBase
       SecuritySubMenu,
       Overscan,
       ShowFPS,
+      AutorunEnabled,
       CrtSubMenu,
       Manager,
       FactoryReset,
+      EepromUpdate
     };
 
     static constexpr const char* sOverclockBaseFolder = "/recalbox/system/configs/overclocking";
@@ -120,13 +122,17 @@ class GuiMenuAdvancedSettings : public GuiMenuBase
      * ISwitchComponent implementation
      */
 
-    void SwitchComponentChanged(int id, bool status) override;
+    void SwitchComponentChanged(int id, bool& status) override;
 
     /*
      * IGuiMenuBase implementation
      */
 
     void SubMenuSelected(int id) override;
+
+    void EepromUpdate();
+
+    String ExtractVersion(String cmdResult, String updateType);
 };
 
 

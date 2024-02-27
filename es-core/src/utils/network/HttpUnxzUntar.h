@@ -6,15 +6,15 @@
 //
 #pragma once
 
-#include <utils/network/Http.h>
+#include <utils/network/HttpClient.h>
 #include "utils/tar/Tar.h"
 #include "utils/xz/Xz.h"
 
-class HttpUnxzUntar : public Http
+class HttpUnxzUntar : public HttpClient
 {
   public:
-    HttpUnxzUntar(Path);
-    bool SimpleExecute(const String& url, Http::IDownload* interface);
+    explicit HttpUnxzUntar(const Path& path);
+    bool SimpleExecute(const String& url, HttpClient::IDownload* interface);
 //    bool Execute(const String& url, const Path& output, IDownload* interface);
 
   private:
@@ -42,7 +42,7 @@ class HttpUnxzUntar : public Http
      */
     void DataEnd() final;
 
-    const Path *mOutputPath;
+    const Path mOutputPath;
     /* !
      * @brief Process download buffer
      * first unxz and then untar

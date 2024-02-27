@@ -45,7 +45,6 @@ class GuiMenuUserInterface : public GuiMenuBase
       UpdateGamelist,
       Filters,
       DisplayByFileName,
-      Arcade,
     };
 
     //! System Manager
@@ -80,7 +79,7 @@ class GuiMenuUserInterface : public GuiMenuBase
      * ISwitchComponent implementation
      */
 
-    void SwitchComponentChanged(int id, bool status) override;
+    void SwitchComponentChanged(int id, bool& status) override;
 
     /*
      * IOptionListComponent<SystemSorting> implementation

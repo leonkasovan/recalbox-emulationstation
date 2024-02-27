@@ -6,11 +6,13 @@
 #include <components/ComponentList.h>
 #include <input/InputStack.h>
 #include <utils/locale/LocaleHelper.h>
+#include <input/IInputChange.h>
 
 class TextComponent;
 
 class GuiInputConfig : public Gui
                      , private IComponentListRowEventInterceptor
+                     , private IInputChange
 {
   public:
     GuiInputConfig(WindowManager& window, InputDevice* target, const std::function<void()>& doneCallback);
@@ -83,6 +85,7 @@ class GuiInputConfig : public Gui
 
     bool mNeutralPositionSet;           //!< Neutral position has been reached, we can start recording
     bool mCursorOnList;
+    bool mFirstEventReceived;           //!< First event received flag
     unsigned int mMainColor;
 
     /*!
@@ -98,4 +101,12 @@ class GuiInputConfig : public Gui
      * @brief Process all received events
      */
     void ProcessEvents();
+
+
+    /*
+     * IInputChange implementation
+     */
+
+    //! Refresh pad list
+    void PadsAddedOrRemoved(bool removed) override { if (removed) Close(); };
 };

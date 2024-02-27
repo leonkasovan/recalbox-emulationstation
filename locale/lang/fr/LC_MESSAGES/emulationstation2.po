@@ -1945,10 +1945,10 @@ msgid "BIOS UNSAFE"
 msgstr "BIOS DOUTEUX"
 
 msgid "BIOS KO"
-msgstr "BIOS NON OK"
+msgstr "NON OK"
 
 msgid "BIOS NOT FOUND"
-msgstr "BIOS NON TROUVÉS"
+msgstr "NON TROUVÉS"
 
 msgid "MD5 OK"
 msgstr "MD5 OK"

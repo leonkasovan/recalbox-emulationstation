@@ -135,15 +135,15 @@ TextureLoader::TextureLoader() : mExit(false)
 
 TextureLoader::~TextureLoader()
 {
-	// Just abort any waiting texture
-	mTextureDataQ.clear();
-	mTextureDataLookup.clear();
-
 	// Exit the thread
 	mExit = true;
 	mEvent.notify_one();
 	mThread->join();
 	delete mThread;
+
+  // Just abort any waiting texture
+  mTextureDataQ.clear();
+  mTextureDataLookup.clear();
 }
 
 void TextureLoader::threadProc()

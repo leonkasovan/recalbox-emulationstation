@@ -13,9 +13,12 @@
 #include <patreon/IPatreonNotification.h>
 #include "bluetooth/BluetoothListener.h"
 #include "recalbox/BootConf.h"
+#include <btautopair/BTAutopairManager.h>
+#include <bios/IBiosScanReporting.h>
 
 class AudioManager;
 class SystemManager;
+class BiosManager;
 
 //! Special operations
 enum class HardwareTriggeredSpecialOperations
@@ -74,6 +77,7 @@ class MainRunner
   , private ILongExecution<USBInitialization, bool>
   , public ISdl2EventNotifier
   , public ISpecialGlobalAction
+  , public IBiosScanReporting
 {
   public:
     //! Pending Exit
@@ -163,6 +167,9 @@ class MainRunner
     //! Ignored files
     HashSet<String> mIgnoredFiles;
 
+    //! Bluetooth Autopair Manager
+    BTAutopairManager mBTAutopairManager;
+
     /*!
      * @brief Reset last exit state
      */
@@ -224,6 +231,11 @@ class MainRunner
     static void CheckFirstTimeWizard(WindowManager& window);
 
     /*!
+     * @brief Check Recalbox Lite status and show wizard
+     */
+    static void CheckRecalboxLite(WindowManager& window);
+
+    /*!
      * @brief Initialize input configurations
      * @param window Main window
      */
@@ -235,6 +247,11 @@ class MainRunner
      * @param systemManager System Manager
      */
     static void CheckAlert(WindowManager& window, SystemManager& systemManager);
+
+    /*!
+     * @brief Send mqtt message to enable joystick auopairing
+     */
+    //static void EnableAutopair();
 
     /*!
      * @brief Main SDL event loop w/ UI update/refresh
@@ -329,10 +346,22 @@ class MainRunner
     void BrightnessDecrease(BoardType board, float percent) final;
 
     /*!
-     * @brief Increase volume
+     * @brief Increase brightness
      * @param board current board
      */
     void BrightnessIncrease(BoardType board, float percent) final;
+
+    /*!
+     * @brief Undervoltage alert
+     * @param board current board
+     */
+    void UnderVoltage(BoardType board) final;
+
+    /*!
+     * @brief HighTemperature detected
+     * @param board current board
+     */
+    void TemperatureAlert(BoardType board) final;
 
     /*
      * ILongExecution implementation
@@ -394,6 +423,21 @@ class MainRunner
      * @param result Not used
      */
     void Completed(const USBInitialization& parameter, const bool& result) final;
+
+    /*
+     * IBiosScanReporting implementation
+     */
+
+    /*!
+     * @brief Report a new Bios has been scanned
+     * @param bios Newly scanned bios
+     */
+    void ScanProgress(const Bios& bios) override { (void)bios; }
+
+    /*!
+     * @brief Report the bios scan is complete
+     */
+    void ScanComplete() override;
 
   public:
     /*!

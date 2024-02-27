@@ -76,6 +76,18 @@ void HardwareMessageSender::ProcessMessage(const HardwareMessage& message)
       mNotificationInterface.BrightnessIncrease(message.mBoardType, 0.10f);
       break;
     }
+    case MessageTypes::UnderVoltage:
+    {
+      { LOG(LogDebug) << "[Hardware] UnderVoltage detected."; }
+      mNotificationInterface.UnderVoltage(message.mBoardType);
+      break;
+    }
+    case MessageTypes::TemperatureLimit:
+    {
+      { LOG(LogDebug) << "[Hardware] Temperature soft limit detected."; }
+      mNotificationInterface.TemperatureAlert(message.mBoardType);
+      break;
+    }
     default: break;
   }
 }

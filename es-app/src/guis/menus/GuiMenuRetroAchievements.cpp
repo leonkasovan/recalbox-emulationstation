@@ -32,7 +32,7 @@ void GuiMenuRetroAchievements::EditableComponentTextChanged(int id, const String
   else if ((Components)id == Components::Password) RecalboxConf::Instance().SetRetroAchievementPassword(text).Save();
 }
 
-void GuiMenuRetroAchievements::SwitchComponentChanged(int id, bool status)
+void GuiMenuRetroAchievements::SwitchComponentChanged(int id, bool& status)
 {
   if ((Components)id == Components::Enabled) RecalboxConf::Instance().SetRetroAchievementOnOff(status).Save();
   else if ((Components)id == Components::Hardcore) RecalboxConf::Instance().SetRetroAchievementHardcore(status).Save();

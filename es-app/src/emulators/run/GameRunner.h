@@ -20,7 +20,7 @@ class GameRunner : public StaticLifeCycleControler<GameRunner>
      * @param window Window manager
      * @param systemManager System manager
      */
-    GameRunner(WindowManager& window, SystemManager& systemManager, ISdl2EventNotifier& sdl2Callback)
+    GameRunner(WindowManager* window, SystemManager& systemManager, ISdl2EventNotifier& sdl2Callback)
       : StaticLifeCycleControler<GameRunner>("GameRunner")
       , mWindowManager(window)
       , mSystemManager(systemManager)
@@ -54,7 +54,7 @@ class GameRunner : public StaticLifeCycleControler<GameRunner>
      * @brief Initialize demo launching
      * @return Controller configuration string
      */
-    static void SubSystemPrepareForRun();
+    void SubSystemPrepareForRun();
 
     /*!
      * @brief Finalize demo run
@@ -83,12 +83,14 @@ class GameRunner : public StaticLifeCycleControler<GameRunner>
      */
     static bool IsGameRunning() { return sGameIsRunning; }
 
+    void SetWindowManager(WindowManager *window) { mWindowManager = window; }
+
   private:
     //! CPU Governance file
     static constexpr const char* sGovernanceFile = "/recalbox/share_init/system/configs/.governances.cfg";
 
     //! Window manager reference
-    WindowManager& mWindowManager;
+    WindowManager* mWindowManager;
     //! System manager reference
     SystemManager& mSystemManager;
     //! SDL callback interface
@@ -99,11 +101,12 @@ class GameRunner : public StaticLifeCycleControler<GameRunner>
 
     /*!
      * @brief Build CRT options from the CRT interface
+     * @param system System
      * @param data CRT Data
      * @param demo starting a demo
      * @return Option string
      */
-    static String BuildCRTOptions(const CrtData& data, RotationType rotation, const bool demo);
+    static String BuildCRTOptions(const SystemData& system, const CrtData& data, RotationType rotation, const bool demo);
 
     /*!
     * @brief Automatic Game running flag management

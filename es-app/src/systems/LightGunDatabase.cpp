@@ -8,28 +8,33 @@
 #include "LightGunDatabase.h"
 
 LightGunDatabase::LightGunDatabase()
-  : mCurrentList(nullptr)
+  : mCurrentSystem(nullptr)
+  , mCurrentList(nullptr)
 {
   LoadDatabase();
 }
 
-bool LightGunDatabase::SetCurrentSystem(const SystemData& system)
+void LightGunDatabase::SetCurrentSystem(const SystemData& system)
 {
+  if (mCurrentSystem == &system) return;
+  mCurrentSystem = &system;
   mCurrentList = mSystemLists.try_get(system.Name());
   { LOG(LogDebug) << "[LightGun] System " << system.Name() << " selected."; }
-  return mCurrentList != nullptr;
 }
 
 bool LightGunDatabase::ApplyFilter(const FileData& file)
 {
   String name = GetSimplifiedName(file.Name().empty() ? file.RomPath().FilenameWithoutExtension() : file.Name());
+  SetCurrentSystem(file.System());
   if (mCurrentList != nullptr)
-    for(const String& gamename : *mCurrentList)
+  {
+    for (const String& gamename: *mCurrentList)
       if (name.Contains(gamename))
       {
         { LOG(LogTrace) << "[LightGun] Game " << file.Name() << " match database name " << gamename; }
         return true;
       }
+  }
   return false;
 }
 

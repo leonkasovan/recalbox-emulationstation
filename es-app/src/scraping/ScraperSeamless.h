@@ -11,6 +11,7 @@
 #include <utils/os/system/ThreadPool.h>
 #include <utils/cplusplus/StaticLifeCycleControler.h>
 #include <scraping/scrapers/screenscraper/ScreenScraperSingleEngine.h>
+// #include <scraping/scrapers/recalbox/RecalboxEndPoints.h>
 #include <scraping/scrapers/screenscraper/ScreenScraperEndPoints.h>
 #include <utils/sync/SyncMessageSender.h>
 #include <RecalboxConf.h>
@@ -73,6 +74,7 @@ class ScraperSeamless : public IThreadPoolWorkerInterface<FileData*, FileData*>
     RecalboxConf& mConfiguration;
 
     //! Endpoint provider
+    // RecalboxEndPoints mEndPoints;
     ScreenScraperEndPoints mEndPoints;
     //! Protected media set
     ProtectedSet mProtectedSet;

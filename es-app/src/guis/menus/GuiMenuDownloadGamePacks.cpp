@@ -28,5 +28,5 @@ GuiMenuDownloadGamePacks::GuiMenuDownloadGamePacks(WindowManager& window, System
 void GuiMenuDownloadGamePacks::SubMenuSelected(int id)
 {
   SystemData& target = mSystemManager.GetOrCreateSystem(mDescriptors[id]);
-  mWindow.pushGui(new GuiDownloader(mWindow, target));
+  mWindow.pushGui(new GuiDownloader(mWindow, target, mSystemManager));
 }

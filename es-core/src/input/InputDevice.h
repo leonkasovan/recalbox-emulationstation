@@ -15,6 +15,15 @@ class InputDevice
     //! Joystick deadzone, in the 0-32767 range
     static constexpr int sJoystickDeadZone = 23000;
 
+    //! Udev information
+    enum class UDevInfo
+    {
+      LowlevelName, //!< Name in ID_VENDOR_END - ID_MODEL_ENC
+      UniqueID,     //!< ATTRS{uniq}
+      PowerPath,    //!< Path to battery information in /sys/class/power_supply/device-ATTRS{uniq}
+    };
+
+    //! Input entry
     enum class Entry
     {
       None,
@@ -56,8 +65,14 @@ class InputDevice
   private:
     InputEvent mInputEvents[(int)Entry::__Count]; //!< Entry configurations
     String mDeviceName;                           //!< Device name: Keyboard or Pad/joystick name
+    String mUDevDeviceName;                       //!< Device name as declared in low level udev device
+    String mUDevUniqID;                           //!< Device unique id as in ATTRS{uniq} from parent udev device
+    Path mUDevPowerPath;                          //!< Battery information path
+    Path mPath;                                   //!< udev Path
     SDL_JoystickGUID mDeviceGUID;                 //!< GUID
     SDL_Joystick* mDeviceSDL;                     //!< SDL2 structure
+    int mLastTimeBatteryCheck;                    //!< Last time the battery level has been read
+    int mBatteryLevel;                            //!< Battery level from 0 to 100
     int mDeviceId;                                //!< SDL2 Joystick Identifier
     int mDeviceIndex;                             //!< SDL2 Joystick Index
     int mDeviceNbAxes;                            //!< Axis count
@@ -67,6 +82,8 @@ class InputDevice
     int mPreviousHatsValues[sMaxHats];            //!< Recorded hat value for move detection
     int mPreviousAxisValues[sMaxAxis];            //!< Recorded axis value for move detection
     int mNeutralAxisValues[sMaxAxis];             //!< Neutral axis values
+    bool mBatteryCharging;                        //!< Pad's battery is in charge
+    bool mIsATruePad;                             //!< Allow elimination of SDL2 false pads
 
     //! Reference time of activated entries
     static unsigned int mReferenceTimes[32];
@@ -97,6 +114,26 @@ class InputDevice
      * @return elapsed time
      */
     int ConvertButtonToOnOff(int button, bool pressed, InputCompactEvent::Entry& on, InputCompactEvent::Entry& off);
+
+    /*!
+     * @brief Build a new Button event to on/off event flags regarding current device configuration
+     * @param button id
+     * @param pressed Key state - true = pressed, false = released
+     * @param on output activated entries
+     * @param off output deactivated entries
+     * @return elapsed time
+     */
+    int ConvertMouseButtonToOnOff(int button, bool pressed, InputCompactEvent::Entry& on, InputCompactEvent::Entry& off);
+
+    /*!
+     * @brief Build a new Mouse wheel event to on/off event flags regarding current device configuration
+     * @param wheel x/y
+     * @param direction wheel direction 1/0/-1
+     * @param on output activated entries
+     * @param off output deactivated entries
+     * @return elapsed time
+     */
+    int ConvertMouseWheelToOnOff(int wheel, int direction, InputCompactEvent::Entry& on, InputCompactEvent::Entry& off);
 
     /*!
      * @brief Build a new key event to on/off event flags regarding current device configuration
@@ -169,9 +206,10 @@ class InputDevice
      * @return Empty InputDevice
      */
     InputDevice()
-      : mDeviceName {}
-      , mDeviceGUID {}
+      : mDeviceGUID {}
       , mDeviceSDL(nullptr)
+      , mLastTimeBatteryCheck(0)
+      , mBatteryLevel(-1)
       , mDeviceId(0)
       , mDeviceIndex(0)
       , mDeviceNbAxes(0)
@@ -181,6 +219,8 @@ class InputDevice
       , mPreviousHatsValues{ 0 }
       , mPreviousAxisValues{ 0 }
       , mNeutralAxisValues{ 0 }
+      , mBatteryCharging(false)
+      , mIsATruePad(false)
       , mConfiguring(false)
       , mHotkeyState(false)
       , mKillSelect(false)
@@ -217,8 +257,10 @@ class InputDevice
      * Accessors
      */
 
-    [[nodiscard]] String Name() const { return mDeviceName; }
-    [[nodiscard]] String NameExtented() const;
+    //[[nodiscard]] String Name() const { return mDeviceName; }   // Original naming
+    [[nodiscard]] const String& Name() const { return !mUDevDeviceName.empty() ? mUDevDeviceName : mDeviceName; } // New naming
+    [[nodiscard]] String NameExtented();
+    [[nodiscard]] const Path& UDevPath() const { return mPath; }
     [[nodiscard]] String GUID() const { char sguid[64]; SDL_JoystickGetGUIDString(mDeviceGUID, sguid, sizeof(sguid)); return sguid; }
     [[nodiscard]] const SDL_JoystickGUID& RawGUID() const { return mDeviceGUID; }
     [[nodiscard]] int Identifier()   const { return mDeviceId; };
@@ -226,11 +268,12 @@ class InputDevice
     [[nodiscard]] int AxeCount()     const { return mDeviceNbAxes; };
     [[nodiscard]] int HatCount()     const { return mDeviceNbHats; };
     [[nodiscard]] int ButtonCount()  const { return mDeviceNbButtons; };
-    [[nodiscard]] String PowerLevel() const;
-    //String getSysPowerLevel();
+    [[nodiscard]] bool HasBatteryLevel() const { return !mUDevPowerPath.IsEmpty(); }
+    [[nodiscard]] int BatteryLevel();
+    [[nodiscard]] String::Unicode BatteryLevelIcon();
 
     [[nodiscard]] bool IsKeyboard() const { return mDeviceId == InputEvent::sKeyboardDevice; }
-    [[nodiscard]] bool IsPad()      const { return mDeviceId != InputEvent::sKeyboardDevice; }
+    [[nodiscard]] bool IsPad()      const { return mDeviceId != InputEvent::sKeyboardDevice && mDeviceId != InputEvent::sMouseDevice; }
 
     /*!
      * @brief Get recorded axis value for a particular axis
@@ -253,6 +296,11 @@ class InputDevice
     [[nodiscard]] bool CheckNeutralPosition() const;
 
     /*!
+     * @brief Record neutral position
+     */
+    void RecordAxisNeutralPosition();
+
+    /*!
      * @brief Reset all InputEvent
      */
     void ClearAll();
@@ -264,6 +312,21 @@ class InputDevice
     void LoadFrom(const InputDevice& source);
 
     /*
+     * Non SDL2 LowLevel
+     */
+
+    //! Get low level name or return SDL2 name if it fails
+    String UDevString(int index, UDevInfo info);
+
+    #ifndef SDL_JOYSTICK_IS_OVERRIDEN_BY_RECALBOX
+    /*!
+     * @brief Lookup /dev/input/ path when using a non patched SDL2
+     * @return
+     */
+    Path LookupPath();
+    #endif
+
+/*
      * Manage entries
      */
 

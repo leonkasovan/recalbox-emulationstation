@@ -747,7 +747,7 @@ static int ping_send_one_ipv6 (pingobj_t *obj, pinghost_t *ph, int fd)
 
 	datalen = strlen (ph->data);
 	buflen = sizeof (*icmp6) + datalen;
-	if (sizeof (buf) < buflen)
+	if ((int)sizeof (buf) < buflen)
 		return (EINVAL);
 
 	data  = buf + ICMP_MINLEN;

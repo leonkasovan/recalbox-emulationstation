@@ -3,7 +3,7 @@
 //
 
 #include "PatronInfo.h"
-#include "utils/network/Http.h"
+#include "utils/network/HttpClient.h"
 #include <rapidjson/document.h>
 #include <RecalboxConf.h>
 #include <recalbox/RecalboxSystem.h>

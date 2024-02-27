@@ -11,7 +11,7 @@
 #include <utils/os/system/Thread.h>
 #include <patreon/IPatreonNotification.h>
 #include <utils/sync/SyncMessageSender.h>
-#include "utils/network/Http.h"
+#include "utils/network/HttpClient.h"
 
 class PatronInfo : public StaticLifeCycleControler<PatronInfo>
                  , public Thread
@@ -80,7 +80,7 @@ class PatronInfo : public StaticLifeCycleControler<PatronInfo>
     SyncMessageSender<void> mEvent;     //!< Synchronous event to send/receive synchronized messages
 
     //! Http object
-    Http mHttp;
+    HttpClient mHttp;
 
     Mutex       mLocker;                //!< Prevent members from being accessed from different threads
     String mToken;                 //!< User toten from Patreon

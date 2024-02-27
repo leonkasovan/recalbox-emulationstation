@@ -95,3 +95,8 @@ void SystemHasher::Push(SystemData* system)
   mSignal.Fire();
 }
 
+void SystemHasher::MustQuit()
+{
+  Thread::Stop();
+}
+

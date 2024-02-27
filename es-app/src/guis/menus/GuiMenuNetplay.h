@@ -90,7 +90,7 @@ class GuiMenuNetplay : public GuiMenuBase
      * ISWitchComponent implementation
      */
 
-    void SwitchComponentChanged(int id, bool status) override;
+    void SwitchComponentChanged(int id, bool& status) override;
 
     /*
      * ILongExecution implementation

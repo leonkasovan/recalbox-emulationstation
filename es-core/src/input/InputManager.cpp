@@ -15,12 +15,14 @@
 #define EMPTY_GUID_STRING { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }
 
 InputManager::InputManager()
-  : mIndexToId {}
-  , mKeyboard(nullptr, InputEvent::sKeyboardDevice, -1, "Keyboard", KEYBOARD_GUID_STRING, 0, 0, 125)
-  , mMousse(nullptr, InputEvent::sMousseDevice, 0, "Mousse", KEYBOARD_GUID_STRING, 0, 0, 5)
+  : StaticLifeCycleControler<InputManager>("inputmanager")
+  , mIndexToId {}
+  , mKeyboard(nullptr, InputEvent::sKeyboardDevice, (int)InputEvent::sKeyboardDevice, "Keyboard", KEYBOARD_GUID_STRING, 0, 0, 125)
+  , mMousse(nullptr, InputEvent::sMouseDevice, (int)InputEvent::sMouseDevice, "Mouse", KEYBOARD_GUID_STRING, 0, 0, 5)
   , mScancodeStates()
   , mScancodePreviousStates()
   , mJoystickChangePending(false)
+  , mJoystickChangePendingRemoved(false)
 {
   memset(mScancodeStates, 0, sizeof(mScancodeStates));
   memset(mScancodePreviousStates, 0, sizeof(mScancodePreviousStates));
@@ -29,12 +31,19 @@ InputManager::InputManager()
   // Watcher
   mFileNotifier.SetEventNotifier(EventType::Remove | EventType::Create, this);
   mFileNotifier.WatchFile(Path("/dev/input"));
+  // Add mapper to pad change callbacks
+  mNotificationInterfaces.Add(&mMapper);
 }
 
-InputManager& InputManager::Instance()
+int InputManager::GetDeviceIndexFromId(SDL_JoystickID deviceId)
 {
-  static InputManager _instance;
-  return _instance;
+  // Already exists?
+  InputDevice* device = mIdToDevices.try_get(deviceId);
+  if (device != nullptr)
+    return device->Index();
+
+  //{ LOG(LogError) << "[Input] Unexisting device!"; }
+  return -1;
 }
 
 String InputManager::GetDeviceNameFromId(SDL_JoystickID deviceId)
@@ -45,7 +54,6 @@ String InputManager::GetDeviceNameFromId(SDL_JoystickID deviceId)
     return device->Name();
 
   { LOG(LogError) << "[Input] Unexisting device!"; }
-
   return "Unknown";
 }
 
@@ -57,7 +65,7 @@ InputDevice& InputManager::GetDeviceConfigurationFromId(SDL_JoystickID deviceId)
     return *device;
 
   { LOG(LogError) << "[Input] Unexisting device!"; }
-  static InputDevice sEmptyDevice(nullptr, InputEvent::sEmptyDevice, -1, "Empty Device", EMPTY_GUID_STRING, 0, 0, 0);
+  static InputDevice sEmptyDevice(nullptr, InputEvent::sEmptyDevice, (int)InputEvent::sEmptyDevice, "Empty Device", EMPTY_GUID_STRING, 0, 0, 0);
   return sEmptyDevice;
 }
 
@@ -127,8 +135,13 @@ void InputManager::LoadDefaultKeyboardConfiguration()
   //WriteDeviceXmlConfiguration(mKeyboard);
 
   mMousse.ClearAll();
-  mMousse.Set(InputDevice::Entry::B, InputEvent(InputEvent::sMousseDevice, InputEvent::EventType::Button, SDL_BUTTON_LEFT, 1));
-  mMousse.Set(InputDevice::Entry::A, InputEvent(InputEvent::sMousseDevice, InputEvent::EventType::Button, SDL_BUTTON_RIGHT, 1));
+  mMousse.Set(InputDevice::Entry::B, InputEvent(InputEvent::sMouseDevice, InputEvent::EventType::MouseButton, 1, 1));
+  mMousse.Set(InputDevice::Entry::Start, InputEvent(InputEvent::sMouseDevice, InputEvent::EventType::MouseButton, 2, 1));
+  mMousse.Set(InputDevice::Entry::A, InputEvent(InputEvent::sMouseDevice, InputEvent::EventType::MouseButton, 3, 1));
+  mMousse.Set(InputDevice::Entry::Up, InputEvent(InputEvent::sMouseDevice, InputEvent::EventType::MouseWheel, SDL_MOUSEWHEEL_NORMAL, 1));
+  mMousse.Set(InputDevice::Entry::Down, InputEvent(InputEvent::sMouseDevice, InputEvent::EventType::MouseWheel, SDL_MOUSEWHEEL_NORMAL, -1));
+  mMousse.Set(InputDevice::Entry::Left, InputEvent(InputEvent::sMouseDevice, InputEvent::EventType::MouseWheel, SDL_MOUSEWHEEL_FLIPPED, 1));
+  mMousse.Set(InputDevice::Entry::Right, InputEvent(InputEvent::sMouseDevice, InputEvent::EventType::MouseWheel, SDL_MOUSEWHEEL_FLIPPED, -1));
 
   // Load configuration
   LookupDeviceXmlConfiguration(mKeyboard);
@@ -167,51 +180,38 @@ void InputManager::LoadAllJoysticksConfiguration(std::vector<InputDevice> previo
   for (int i = 0; i < numJoysticks; i++)
     LoadJoystickConfiguration(i);
 
+  //! Notify
+  for(IInputChange* input : mNotificationInterfaces)
+    input->PadsAddedOrRemoved(mJoystickChangePendingRemoved);
+
   // No info popup ?
   if (window == nullptr) return;
   if (!padplugged) return;
 
+  // Build current list & make diff with previous list
   std::vector<InputDevice> current = BuildCurrentDeviceList();
-  if (current.size() > previous.size())
+  KeepDifferentPads(current, previous);
+  // Popup every added pad
+  for(const InputDevice& added : current)
   {
-    while (current.size() > previous.size())
-    {
-      // Joystick added
-      int index = 0;
-      while (index < (int) previous.size() && previous[index].EqualsTo(current[index]))
-        index++;
+    // Build the text
+    String text = added.Name();
+    text.Append(' ').Append(_(" has been plugged!")).Append("\n\n");
+    if (added.IsConfigured()) text.Append(_("Ready to play!"));
+    else text.Append(_("Not configured yet! Press a button to enter the configuration window."));
 
-      // Build the text
-      String text = current[index].Name();
-      text.Append(' ')
-          .Append(_(" has been plugged!"))
-          .Append("\n\n");
-      if (current[index].IsConfigured()) text.Append(_("Ready to play!"));
-      else text.Append(_("Not configured yet! Press a button to enter the configuration window."));
-      current.erase(current.begin() + index);
-
-      GuiInfoPopupBase* popup = new GuiInfoPopup(*window, text, 10, PopupType::Pads);
-      window->InfoPopupAdd(popup);
-    }
+    GuiInfoPopupBase* popup = new GuiInfoPopup(*window, text, 10, PopupType::Pads);
+    window->InfoPopupAdd(popup);
   }
-  else
+  // Popup every added pad
+  for(const InputDevice& removed : previous)
   {
-    while (current.size() < previous.size())
-    {
-      // Joystick removed
-      int index = 0;
-      while (index < (int) current.size() && previous[index].EqualsTo(current[index]))
-        index++;
+    // Build the text
+    String text = removed.Name();
+    text.Append(' ').Append(_(" has been unplugged!"));
 
-      // Build the text
-      String text = previous[index].Name();
-      text.Append(' ')
-          .Append(_(" has been unplugged!"));
-      previous.erase(previous.begin() + index);
-
-      GuiInfoPopupBase* popup = new GuiInfoPopup(*window, text, 10, PopupType::Pads);
-      window->InfoPopupAdd(popup);
-    }
+    GuiInfoPopupBase* popup = new GuiInfoPopup(*window, text, 10, PopupType::Pads);
+    window->InfoPopupAdd(popup);
   }
 }
 
@@ -225,11 +225,18 @@ String InputManager::DeviceGUIDString(SDL_Joystick* joystick)
 void InputManager::LoadJoystickConfiguration(int index)
 {
   bool autoConfigured = true;
-  { LOG(LogInfo) << "[InputManager] Lond configuration for Joystick #: " << index; }
+  { LOG(LogInfo) << "[InputManager] Load configuration for Joystick #: " << index; }
 
   // Open joystick & add to our list
   SDL_Joystick* joy = SDL_JoystickOpen(index);
   if (joy == nullptr) return;
+
+  // Get device properties
+  int buttons = SDL_JoystickNumButtons(joy);
+  int axes    = SDL_JoystickNumAxes(joy);
+  int hats    = SDL_JoystickNumHats(joy);
+
+  // Record device properties
   SDL_JoystickID identifier = SDL_JoystickInstanceID(joy);
   mIdToSdlJoysticks[identifier] = joy;
   mIndexToId[index] = identifier;
@@ -240,9 +247,9 @@ void InputManager::LoadJoystickConfiguration(int index)
                      index,
                      SDL_JoystickName(joy),
                      SDL_JoystickGetGUID(joy),
-                     SDL_JoystickNumAxes(joy),
-                     SDL_JoystickNumHats(joy),
-                     SDL_JoystickNumButtons(joy));
+                     axes,
+                     hats,
+                     buttons);
 
   // Try to load from configuration file
   if (!LookupDeviceXmlConfiguration(device))
@@ -273,16 +280,14 @@ void InputManager::LoadJoystickConfiguration(int index)
                       << ", Buttons: " << SDL_JoystickNumButtons(joy) << ')'; }
     WriteDeviceXmlConfiguration(device);
   }
-
 }
 
-int InputManager::ConfiguredDeviceCount()
+int InputManager::ConfiguredControllersCount()
 {
-  int num = mKeyboard.IsConfigured() ? 1 : 0;
+  int num = 0;
   for (auto& mInputConfig : mIdToDevices)
     if (mInputConfig.second.IsConfigured())
       num++;
-
   return num;
 }
 
@@ -327,9 +332,17 @@ InputCompactEvent InputManager::ManageKeyEvent(const SDL_KeyboardEvent& key, boo
   return mKeyboard.ConvertToCompact(event);
 }
 
-InputCompactEvent InputManager::ManageMousseButtonEvent(const SDL_MouseButtonEvent& button, bool down)
+InputCompactEvent InputManager::ManageMouseButtonEvent(const SDL_MouseButtonEvent& button, bool down)
 {
-  InputEvent event = InputEvent((int)button.which, InputEvent::EventType::Button, button.button, down  ? 1 : 0);
+  InputEvent event = InputEvent((int)button.which, InputEvent::EventType::MouseButton, button.button, down  ? 1 : 0);
+  return mMousse.ConvertToCompact(event);
+}
+
+InputCompactEvent InputManager::ManageMouseWheelEvent(const SDL_MouseWheelEvent& wheel)
+{
+  InputEvent event = InputEvent(InputEvent::sMouseDevice, InputEvent::EventType::MouseWheel,
+                                wheel.y != 0 ? SDL_MOUSEWHEEL_NORMAL : wheel.x != 0 ? SDL_MOUSEWHEEL_FLIPPED : -1,
+                                (wheel.y != 0 ? wheel.y : wheel.x) << ((int)wheel.which < 0 ? 1 : 0));
   return mMousse.ConvertToCompact(event);
 }
 
@@ -344,7 +357,8 @@ InputCompactEvent InputManager::ManageSDLEvent(WindowManager* window, const SDL_
     case SDL_KEYDOWN:
     case SDL_KEYUP: return ManageKeyEvent(ev.key, ev.type == SDL_KEYDOWN);
     case SDL_MOUSEBUTTONDOWN:
-    case SDL_MOUSEBUTTONUP: return ManageMousseButtonEvent(ev.button, ev.type == SDL_MOUSEBUTTONDOWN);
+    case SDL_MOUSEBUTTONUP: return ManageMouseButtonEvent(ev.button, ev.type == SDL_MOUSEBUTTONDOWN);
+    case SDL_MOUSEWHEEL: return ManageMouseWheelEvent(ev.wheel);
     case SDL_JOYDEVICEADDED:
     case SDL_JOYDEVICEREMOVED:
     {
@@ -352,8 +366,6 @@ InputCompactEvent InputManager::ManageSDLEvent(WindowManager* window, const SDL_
       SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
       SDL_InitSubSystem(SDL_INIT_JOYSTICK);
       Refresh(window, true);
-      for(int i = mNotificationInterfaces.Count(); --i >= 0; )
-        mNotificationInterfaces[i]->PadsAddedOrRemoved();
       break;
     }
   }
@@ -475,11 +487,12 @@ void InputManager::WriteDeviceXmlConfiguration(InputDevice& device)
 OrderedDevices InputManager::GetMappedDeviceList(const InputMapper& mapper)
 {
   OrderedDevices devices;
-  for (int player = 0; player < Input::sMaxInputDevices; ++player)
+  InputMapper::PadList list = mapper.GetPads();
+  for (int player = 0; player < (int)list.size(); ++player)
   {
-    const InputMapper::Pad& pad = mapper.PadAt(player);
+    const InputMapper::Pad& pad = list[player];
     if (pad.IsConnected())
-      devices.SetDevice(player, mIdToDevices[pad.Identifier]);
+      devices.SetDevice(player, mIdToDevices[mIndexToId[pad.mIndex]]);
   }
 
   return devices;
@@ -488,12 +501,13 @@ OrderedDevices InputManager::GetMappedDeviceList(const InputMapper& mapper)
 String InputManager::GetMappedDeviceListConfiguration(const InputMapper& mapper)
 {
   String command;
-  for (int player = 0; player < Input::sMaxInputDevices; ++player)
+  InputMapper::PadList list = mapper.GetPads();
+  for (int player = 0; player < (int)list.size(); ++player)
   {
-    const InputMapper::Pad& pad = mapper.PadAt(player);
+    const InputMapper::Pad& pad = list[player];
     if (pad.IsConnected())
     {
-      const InputDevice& device = mIdToDevices[pad.Identifier];
+      const InputDevice& device = mIdToDevices[mIndexToId[pad.mIndex]];
       String p(" -p"); p.Append(player + 1);
       command.Append(p).Append("index ").Append(device.Index())
              .Append(p).Append("guid ").Append(device.GUID())
@@ -501,14 +515,7 @@ String InputManager::GetMappedDeviceListConfiguration(const InputMapper& mapper)
              .Append(p).Append("nbaxes ").Append(device.AxeCount())
              .Append(p).Append("nbhats ").Append(device.HatCount())
              .Append(p).Append("nbbuttons ").Append(device.ButtonCount())
-             #ifdef SDL_JOYSTICK_IS_OVERRIDEN_BY_RECALBOX
-               .Append(p).Append("devicepath ").Append(SDL_JoystickDevicePathById(device.Index()))
-             #else
-               #ifdef _RECALBOX_PRODUCTION_BUILD_
-                 #pragma GCC error "SDL_JOYSTICK_IS_OVERRIDEN_BY_RECALBOX undefined in production build!"
-               #endif
-             #endif
-             ;
+             .Append(p).Append("devicepath ").Append(device.UDevPath().ToString());
     }
   }
   { LOG(LogInfo) << "[Input] Configure emulators command : " << command; }
@@ -542,8 +549,12 @@ void InputManager::FileSystemWatcherNotification(EventType event, const Path& pa
 {
   (void)time;
   { LOG(LogWarning) << "[/dev/input] Event " << (int)event << " : " << path.ToString(); }
-  if (path.Filename().StartsWith("event"))
-    mJoystickChangePending = true;
+  if (path.Filename().StartsWith("js"))
+    if (path.Filename().AsInt(2, -1) != -1)
+    {
+      mJoystickChangePending = true;
+      mJoystickChangePendingRemoved = (event == EventType::Remove);
+    }
 }
 
 void InputManager::WatchJoystickAddRemove(WindowManager* window)
@@ -556,6 +567,24 @@ void InputManager::WatchJoystickAddRemove(WindowManager* window)
     SDL_InitSubSystem(SDL_INIT_JOYSTICK);
     Refresh(window, true);
     mJoystickChangePending = false;
+  }
+}
+
+void InputManager::KeepDifferentPads(std::vector<InputDevice>& left, std::vector<InputDevice>& right)
+{
+  for (int l = (int)left.size(); --l >= 0;)
+  {
+    const InputDevice& leftDevice = left[l];
+    for(int r = (int)right.size(); --r >= 0; )
+    {
+      const InputDevice& rightDevice = right[r];
+      if (leftDevice.EqualsTo(rightDevice))
+      {
+        left.erase(left.begin() + l);
+        right.erase(right.begin() + r);
+        break;
+      }
+    }
   }
 }
 

@@ -7,9 +7,9 @@
 
 #pragma once
 
-#include "Wizard.h"
+#include "SimpleWizardBase.h"
 
-class WizardLanguage : public Wizard
+class WizardLanguage : public SimpleWizardBase
 {
   public:
     /*!
@@ -19,7 +19,7 @@ class WizardLanguage : public Wizard
      * @param pagecount
      */
     explicit WizardLanguage(WindowManager& window, const String& title, int pagecount)
-    : Wizard(window, title, pagecount)
+    : SimpleWizardBase(window, title, pagecount)
     {
     }
 

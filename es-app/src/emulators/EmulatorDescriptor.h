@@ -183,6 +183,9 @@ class EmulatorDescriptor
     //! Core specifications
     std::vector<Core> mCores;
 
+    //! Give access to private part from the webmanager process class
+    friend class RequestHandlerTools;
+
     [[nodiscard]] const Core& CoreAt(int index) const { return (unsigned int)index < (unsigned int)mCores.size() ? mCores[index] : mCores[0]; }
 
     /*!

@@ -21,7 +21,6 @@
 #include "GuiMenuArcade.h"
 #include "GuiMenuDownloadGamePacks.h"
 #include <guis/GuiScraperRun.h>
-#include <utils/Files.h>
 
 GuiMenu::GuiMenu(WindowManager& window, SystemManager& systemManager)
   : GuiMenuBase(window, _("MAIN MENU"), this)
@@ -45,17 +44,19 @@ GuiMenu::GuiMenu(WindowManager& window, SystemManager& systemManager)
   // Recalbox RGB Dual menu
   if(Board::Instance().CrtBoard().GetCrtAdapter() == CrtAdapterType::RGBDual)
     AddSubMenu(_("RECALBOX RGB DUAL"), mTheme.menuIconSet.recalboxrgbdual, (int)Components::RecalboxRGBDual, _(MENUMESSAGE_RECALBOXRGBDUAL_HELP_MSG));
+  if(Board::Instance().CrtBoard().GetCrtAdapter() == CrtAdapterType::RGBJamma || Board::Instance().CrtBoard().GetCrtAdapter() == CrtAdapterType::RGBJammaV2)
+    AddSubMenu(_("RECALBOX RGB JAMMA"), mTheme.menuIconSet.recalboxrgbdual, (int)Components::RecalboxRGBDual, _(MENUMESSAGE_RECALBOXRGBDUAL_HELP_MSG));
 
   // Games menu
   AddSubMenu(_("GAMES SETTINGS"), mTheme.menuIconSet.games, (int)Components::Games, _(MENUMESSAGE_GAME_SETTINGS_HELP_MSG));
 
-  // Games menu
+  // Download menu
   if (!bartop)
-    AddSubMenu(_("DOWNLOAD CONTENTS"), mTheme.menuIconSet.games, (int)Components::ContentDoanwloader, _(MENUMESSAGE_DOWNLOADERS_SETTINGS_HELP_MSG));
+    AddSubMenu(_("DOWNLOAD CONTENTS"), mTheme.menuIconSet.download, (int)Components::ContentDoanwloader, _(MENUMESSAGE_DOWNLOADERS_SETTINGS_HELP_MSG));
 
   // Controllers menu
   if (!bartop)
-    AddSubMenu(_("CONTROLLERS SETTINGS"), mTheme.menuIconSet.updates, (int)Components::Controllers, _(MENUMESSAGE_CONTROLLER_HELP_MSG));
+    AddSubMenu(_("CONTROLLERS SETTINGS"), mTheme.menuIconSet.controllers, (int)Components::Controllers, _(MENUMESSAGE_CONTROLLER_HELP_MSG));
 
   // UI Settings menu
   if (!bartop)
@@ -89,10 +90,7 @@ GuiMenu::GuiMenu(WindowManager& window, SystemManager& systemManager)
     AddSubMenu(_("BIOS CHECKING"), mTheme.menuIconSet.games, (int)Components::Bios, _(MENUMESSAGE_BIOS_HELP_MSG));
 
   // License
-  // AddSubMenu(_("OPEN-SOURCE LICENSE"), mTheme.menuIconSet.license, (int)Components::License);
-
-  // Log
-  AddSubMenu(_("LOG"), mTheme.menuIconSet.system, (int)Components::Log);
+  AddSubMenu(_("OPEN-SOURCE LICENSE"), mTheme.menuIconSet.license, (int)Components::License);
 
   // Quit
   AddSubMenu(_("QUIT"), mTheme.menuIconSet.quit, (int)Components::Quit);
@@ -116,7 +114,7 @@ void GuiMenu::SubMenuSelected(int id)
     case Components::Kodi: if (!GameRunner::Instance().RunKodi()) { LOG(LogWarning) << "[Kodi] Error running Kodi."; } break;
     case Components::System: mWindow.pushGui(new GuiMenuSystem(mWindow, mSystemManager)); break;
     case Components::Update: mWindow.pushGui(new GuiMenuUpdates(mWindow)); break;
-    case Components::RecalboxRGBDual: mWindow.pushGui(new GuiMenuCRT(mWindow)); break;
+    case Components::RecalboxRGBDual: mWindow.pushGui(new GuiMenuCRT(mWindow, Board::Instance().CrtBoard().GetCrtAdapter() == CrtAdapterType::RGBJamma ? _("JAMMA SETTINGS") : _("CRT SETTINGS"))); break;
     case Components::Games: mWindow.pushGui(new GuiMenuGameSettings(mWindow, mSystemManager)); break;
     case Components::ContentDoanwloader:
     {
@@ -128,7 +126,7 @@ void GuiMenu::SubMenuSelected(int id)
     }
     case Components::Controllers: mWindow.pushGui(new GuiMenuPads(mWindow)); break;
     case Components::UISettings: mWindow.pushGui(new GuiMenuUserInterface(mWindow, mSystemManager)); break;
-    case Components::Arcade: mWindow.pushGui(new GuiMenuArcade(mWindow, nullptr)); break;
+    case Components::Arcade: mWindow.pushGui(new GuiMenuArcade(mWindow, mSystemManager, nullptr)); break;
     case Components::Tate: mWindow.pushGui(new GuiMenuTate(mWindow, mSystemManager)); break;
     case Components::Sound: mWindow.pushGui(new GuiMenuSound(mWindow)); break;
     case Components::Network: mWindow.pushGui(new GuiMenuNetwork(mWindow)); break;
@@ -148,15 +146,6 @@ void GuiMenu::SubMenuSelected(int id)
         new GuiMsgBoxScroll(mWindow, "RECALBOX",
                             ScrambleSymetric2(String(MenuMessages::LICENCE_MSG, MenuMessages::LICENCE_MSG_SIZE), __MESSAGE_DECORATOR),
                             _("OK"), nullptr, "", nullptr, "", nullptr, TextAlignment::Left));
-      break;
-    }
-    case Components::Log:
-    {
-      system("tail -30 /recalbox/share/system/logs/frontend.log > /recalbox/share/system/logs/tmp.log");
-      mWindow.pushGui(
-        new GuiMsgBoxScroll(mWindow, "LOG", Files::LoadFile(Path("/recalbox/share/system/logs/tmp.log")),
-                            _("OK"), nullptr, "", nullptr, "", nullptr, TextAlignment::Left));
-      system("rm /recalbox/share/system/logs/tmp.log");
       break;
     }
     case Components::Quit: mWindow.pushGui(new GuiMenuQuit(mWindow)); break;

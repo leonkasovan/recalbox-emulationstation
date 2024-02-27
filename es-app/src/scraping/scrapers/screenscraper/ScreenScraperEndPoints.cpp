@@ -14,7 +14,7 @@
 String ScreenScraperEndPoints::BuildUrlCommon(ScreenScraperEndPoints::Api api, const String& login, const String& password)
 {
   // Url
-  String result("https://www.screenscraper.fr/api2/");
+  String result("https://api.screenscraper.fr/api2/");
   // Api
   switch(api)
   {

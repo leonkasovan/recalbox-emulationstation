@@ -1,14 +1,12 @@
 #pragma once
 
+#include <views/gamelist/ISimpleGameListView.h>
 #include "components/RatingComponent.h"
 #include "components/DateTimeComponent.h"
-#include "components/ImageComponent.h"
 #include "components/VideoComponent.h"
-#include "systems/SystemData.h"
 #include "components/BusyComponent.h"
 #include "components/VerticalScrollableContainer.h"
 #include <views/ViewController.h>
-#include <views/gamelist/ISimpleGameListView.h>
 #include <components/TextListComponent.h>
 #include <games/EmptyData.h>
 #include <scraping/scrapers/IScraperEngineStage.h>
@@ -149,6 +147,11 @@ class DetailedGameListView : public ISimpleGameListView
     //! Fade between mImage & mNoImage
     int mFadeBetweenImage;
 
+    //! Last processed cursor item
+    FileData* mLastCursorItem;
+    //! Current game P2K status
+    bool mLastCursorItemHasP2K;
+
     FileData* getEmptyListItem() override { return &mEmptyListItem; }
 
     bool switchDisplay(bool isGame);
@@ -156,12 +159,31 @@ class DetailedGameListView : public ISimpleGameListView
     std::vector<Component*> getFolderComponents();
     std::vector<Component*> getGameComponents(bool includeMainComponents = true);
     std::vector<Component*> getScrapedFolderComponents();
-    void setFolderInfo(FolderData* folder);
     void setGameInfo(FileData* file, bool update);
     void setRegions(FileData* file);
     void setScrapedFolderInfo(FileData* file);
     //void getFolderGames(FileData* folder, FileData::List &output);
     static void fadeOut(const std::vector<Component*>& comps, bool fadingOut);
+
+    /*!
+     * @brief Gamelist may update thos information if required
+     * @param info
+     */
+    void UpdateSlowData(const SlowDataInformation& info) override;
+
+    /*!
+     * @brief Display folder info
+     * @param folder Folder
+     * @param count Game count in folder
+     * @param path Path of folder images
+     */
+    void SetFolderInfo(FolderData* folder, int count, const FolderImagesPath& path);
+
+    /*!
+     * @brief Check if the game has P2k
+     * @return
+     */
+    [[nodiscard]] bool HasCurrentGameP2K() const override { return mLastCursorItemHasP2K; };
 
     /*!
      * @brief Refresh name & properties of the given item

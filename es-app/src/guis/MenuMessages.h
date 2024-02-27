@@ -37,10 +37,15 @@ class MenuMessages
     #define MENUMESSAGE_GAME_SHADERSET_HELP_MSG "Shaders are like filters for the game rendering. You can select a shader set here, which is a collection of shaders selected for each system. You can also change the shader within the game with HOTKEY + L2 or HOTKEY + R2."
     #define MENUMESSAGE_GAME_HIDE_PREINSTALLED "Hide all pre-installed games. Changing this option makes EmulationStation to relaunch."
     #define MENUMESSAGE_GAME_SOFTPATCHING "Choose strategy\n\n" \
-    "AUTO: auto apply default patch\n\n" \
-    "SELECT: choose manually which patch to apply. Default one or patchs in [ROM_NAME]-patches directory\n\n" \
+    "AUTO: auto apply default patch\n\n"                        \
+    "LAUNCH LAST: always launch the last one (can be modified in edit game menu)\n\n"             \
+    "SELECT: choose manually which patch to apply. Default one or patches in [ROM_NAME]-patches directory\n\n" \
     "DISABLED: never apply patch"
     #define MENUMESSAGE_GAME_SUPERGAMEBOY_HELP_MSG "Set the Super GameBoy mode for GameBoy games."
+    #define MENUMESSAGE_GAME_HD_MODE_HELP_MSG "Improves resolution on compatible 3d emulators. May have an impact on performance. (Dreamcast, Naomi, Atomiswave, Playstation, Saturn)"
+    #define MENUMESSAGE_GAME_WIDESCREEN_MODE_HELP_MSG "Enables 16:9 hacks for compatible emulators. May have an impact on performance. (Dreamcast, Naomi, Atomiswave, Snes, Megadrive)"
+    #define MENUMESSAGE_GAME_VULKAN_DRIVER_HELP_MSG "Enable vulkan driver when available. Enabled by default on RPi4, RPi5, and PC. Set on OFF if Dreamcast, Naomi or Atomiswave stop running."
+
 
     #define MENUMESSAGE_RA_ONOFF_HELP_MSG "Enable or disable RetroAchievements in games."
     #define MENUMESSAGE_RA_HARDCORE_HELP_MSG "Hardcore mode disables *all* savestate and rewind functions within the emulator: you will not be able to save and reload at any time. You will have to complete the game and get the achievements first time, just like on the original console. In reward for this, you will earn both the standard and the hardcore achievement, in effect earning double points! A regular game worth 400 points, is now worth 800 if you complete it on hardcore! For example: if you complete the game for 400 points, you then have the opportunity to earn another 400 on hardcore."
@@ -56,6 +61,9 @@ class MenuMessages
     #define MENUMESSAGE_CONTROLLER_BT_HELP_MSG "Pair a bluetooth controller with your recalbox. Your controller must be in pairing mode."
     #define MENUMESSAGE_CONTROLLER_FORGET_HELP_MSG "Forget all paired bluetooth controllers. You will have to pair your controllers again, but this option can help if you have issues to reconnect a controller, which is already paired."
     #define MENUMESSAGE_CONTROLLER_DRIVER_HELP_MSG "Change the driver if your pad is not working at all or not working properly in-game."
+    #define MENUMESSAGE_CONTROLLER_PADOSD_HELP_MSG "Always display Pad OSD whether you are in pad menus or not."
+    #define MENUMESSAGE_CONTROLLER_PADOSDTYPE_HELP_MSG "Change the icon used to display pad OSD."
+    #define MENUMESSAGE_CONTROLLER_AUTOPAIRONBOOT_HELP_MSG "Activates Bluetooth pairing automatically each time you boot."
 
     #define MENUMESSAGE_UI_HELP_MSG "Configure your EmulationStation experience. Select transition types, help prompts, screensaver behavior. You can also deactivate the onscreen keyboard if you have a real keyboard plugged into your recalbox.\nIf you've added games since the last boot, you can also refresh the gamelist from this menu."
     #define MENUMESSAGE_UI_SCREENSAVER_AFTER_HELP_MSG "Configure screensaver"
@@ -134,6 +142,8 @@ class MenuMessages
     #define MENUMESSAGE_ADVANCED_OVERCLOCK_HELP_MSG "Overclock your board to increase the performance.\nOverclock settings are tested and validated by the community. Keep in mind that overclocking your board can void your warranty."
     #define MENUMESSAGE_ADVANCED_BOOT_ON_SYSTEM_HELP_MSG "Select which system to show when the recalbox frontend starts. The default value is 'favorites'."
     #define MENUMESSAGE_ADVANCED_BOOTGAMELIST_HELP_MSG "On boot, recalbox will show the list of games of the selected system rather than the system view."
+    #define MENUMESSAGE_ADVANCED_SPLASH_HELP_MSG "Enabled or disable videos on boot."
+
     #define MENUMESSAGE_ADVANCED_GAMELISTONLY_HELP_MSG "Only show games contained in the gamelist.xml file (located in your roms directories).\nThis option highly speeds up boot time, but new games will not be detected."
     #define MENUMESSAGE_ADVANCED_HIDESYSTEMVIEW_HELP_MSG "This option allows you to set the selected system to fixed mode. With this option activated, the user cannot access other systems."
     #define MENUMESSAGE_ADVANCED_BASICGAMELISTVIEW_HELP_MSG "Always display the basic gamelist view, even if you have scraped your games."
@@ -159,11 +169,14 @@ class MenuMessages
 
     #define MENUMESSAGE_ADVANCED_OVERSCAN_HELP_MSG "Enable or disable overscan.\nOverscan can help you, if you have a black border, or if the image is bigger than your screen. Before setting the overscan, try to configure your TV to have a 1:1 pixel output.\nMore overscan settings can be defined in the boot.txt file, available when you plug your SD card into your computer."
     #define MENUMESSAGE_ADVANCED_FRAMERATE_HELP_MSG "Show the framerate in EmulationStation and in game."
+    #define MENUMESSAGE_ADVANCED_AUTORUN_HELP_MSG "Enable to select games as auto-runnable games at startup."
     #define MENUMESSAGE_ADVANCED_MANAGER_HELP_MSG "Enable or disable the Recalbox Manager.\nThe Recalbox Manager is a web application available on http://recalbox , if you are on windows, http://recalbox.local , if you are on Linux or Mac, or directly with your recalbox IP : http://192.168.1.XX.\nYou can configure many options from within the manager, and even manage games, saves, and scrapes!"
     #define MENUMESSAGE_ADVANCED_API_HELP_MSG "Enable or disable the recalbox API.\nThe Recalbox API is a REST API exposing endpoints to control your recalbox via http requests."
     #define MENUMESSAGE_ADVANCED_EMU_EMU_HELP_MSG "Select which emulator to use when you start a game for this system."
     #define MENUMESSAGE_ADVANCED_EMU_CORE_HELP_MSG "Select which core to use for the selected emulator. For example, the LIBRETRO emulator has many cores to run Super Nintendo games. The default core you choose here can also be overridden in game specific settings."
     #define MENUMESSAGE_ADVANCED_FACTORY_RESET "WARNING! This option erase all recalbox and emulator configurations! Use it carefully!"
+    #define MENUMESSAGE_ADVANCED_EEPROM_UPDATE "Update your Raspberry Pi's bootloader."
+
 
     #define MENUMESSAGE_GAMELISTOPTION_JUMP_LETTER_MSG "Select a letter and the listing will go directly on the first game starting with this letter."
     #define MENUMESSAGE_GAMELISTOPTION_SORT_GAMES_MSG "Select the way the game list is sortered (alphabetically, by notation...)."
@@ -179,7 +192,8 @@ class MenuMessages
     #define MENUMESSAGE_ADVANCED_CRT_ES_RESOLUTION_HELP_MSG "Select emulationstation resolution. 480i is recommended for better details."
     #define MENUMESSAGE_ADVANCED_CRT_GAME_REGION_HELP_MSG "Let you choice between 50Hz and 60Hz at launch, for compatible systems."
     #define MENUMESSAGE_ADVANCED_CRT_GAME_RESOLUTION_HELP_MSG "Let you choice between 240p, 480i, or 480p at launch, for compatible systems."
-    #define MENUMESSAGE_ADVANCED_CRT_ZERO_LAG_HELP_MSG "Configure emulators to approach a zero lag experience."
+    #define MENUMESSAGE_ADVANCED_CRT_REDUCE_LATENCY_HELP_MSG "Configure emulators to reduce latency."
+    #define MENUMESSAGE_ADVANCED_CRT_RUN_AHEAD_HELP_MSG "Use run ahead to reduce latency. Can have undesired effect on some emulators."
     #define MENUMESSAGE_ADVANCED_CRT_DEMO_RESOLUTION_ON_31KHZ_HELP_MSG "Run the demos in 240p resolution on you 31kHz monitor."
     #define MENUMESSAGE_ADVANCED_CRT_FRONTEND_RESOLUTION_ON_31KHZ_HELP_MSG "Run the frontend in 240p resolution on you 31kHz monitor."
     #define MENUMESSAGE_ADVANCED_CRT_SCANLINES_ON_31KHZ_HELP_MSG "Add scanlines when running games in 480p on 31kHz screen."
@@ -191,7 +205,16 @@ class MenuMessages
     #define MENUMESSAGE_ADVANCED_CRT_V2 "Use experimental CRT V2 implementation. Works only on selected systems."
     #define MENUMESSAGE_ADVANCED_CRT_EXTENDED "Uses a range at the edge of the CRT support to increase image quality."
     #define MENUMESSAGE_ADVANCED_CRT_SUPERREZ "Superrez can increase image quality depending on your CRT."
-
+    #define MENUMESSAGE_ADVANCED_CRT_JAMMA_PANEL_HELP_MSG "Number of button on your arcade cab panel."
+    #define MENUMESSAGE_ADVANCED_CRT_JAMMA_MONO_AMP_BOOST "Boost mono amp power. Use only if the sound level is too low."
+    #define MENUMESSAGE_ADVANCED_CRT_JAMMA_NEOGEO_LAYOUT "Define the NEOGEO layout when playing NEOGEO games."
+    #define MENUMESSAGE_ADVANCED_CRT_JAMMA_CREDIT "Add a credit in game, pressing START + BTN1. Works for all players."
+    #define MENUMESSAGE_ADVANCED_CRT_JAMMA_HK "START + any button will send the HK+BTN event, so you can use special hotkey controls in emulators."
+    #define MENUMESSAGE_ADVANCED_CRT_JAMMA_EXIT "Pressing START for 3sec will exit the game. If you disable this option, you will have to exit the game with SERVICE + TEST."
+    #define MENUMESSAGE_ADVANCED_CRT_JAMMA_SCREEN_TYPE "Select the type of your screen. If you don't know what you are doing, do not change this value."
+    #define MENUMESSAGE_ADVANCED_CRT_JAMMA_4PLAYERS "4 player mode, with player 2 and 3 on CPS2 kickharness."
+    #define MENUMESSAGE_ADVANCED_CRT_JAMMA_AUTOFIRE "Set auto fire for a button by pressing START + a button for 5 seconds"
+    #define MENUMESSAGE_ADVANCED_CRT_JAMMA_BTN6GND "On some cabs, the pins E/27 of the JAMMA are the common ground for controls. Enable this option if you have this configuration."
 
     #define MENUMESSAGE_ADVANCED_RESOLUTION_HELP_MSG "Select system, frontend and emulator resolutions."
     #define MENUMESSAGE_ADVANCED_RESOLUTION_GLOBAL_HELP_MSG "Global resolution is the resolution used by default when specific resolutions are undefined."

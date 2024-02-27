@@ -375,7 +375,7 @@ void GameFilesUtils::DeleteSelectedFiles(FileData& fileData, HashSet<String>& pa
   {
     if (path == gamePath.ToString())
       mainFileDeleted = true;
-    Path(path).Delete();
+    (void)Path(path).Delete();
     { LOG(LogDebug) << "[DELETE] Game file" << path << " has been deleted"; }
   }
 
@@ -401,7 +401,7 @@ void GameFilesUtils::DeleteSelectedFiles(FileData& fileData, HashSet<String>& pa
 
     if (path.Exists() && !IsMediaShared(fileData, path))
     {
-      Path(mediaPath).Delete();
+      (void)Path(mediaPath).Delete();
       { LOG(LogDebug) << "[DELETE] Game media file" << mediaPath << " has been deleted"; }
 
     }
@@ -443,7 +443,7 @@ void GameFilesUtils::DeleteFoldersRecIfEmpty(FolderData* folderData)
 
   FolderData* parent = folderData->Parent();
   Path currentFolder = folderData->RomPath();
-  currentFolder.Delete();
+  (void)currentFolder.Delete();
   parent->RemoveChild(folderData);
   { LOG(LogDebug) << "[DELETE] Directory " << currentFolder.ToString() << " is now empty and have been deleted"; }
 

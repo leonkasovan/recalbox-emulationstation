@@ -2,7 +2,6 @@
 #include <systems/SystemManager.h>
 #include "audio/AudioManager.h"
 #include "games/GameFilesUtils.h"
-#include <emulators/run/NetPlayData.h>
 #include <usernotifications/NotificationManager.h>
 #include <utils/Files.h>
 #include <themes/ThemeException.h>
@@ -56,7 +55,7 @@ Path SystemData::getGamelistPath(const RootFolderData& root, bool forWrite)
   if (forWrite) // Write mode, ensure folder exist
   {
     if (!filePath.Directory().Exists())
-      filePath.Directory().CreatePath();
+      (void)filePath.Directory().CreatePath();
   }
   else if (!filePath.Exists()) // Read mode. Try selected mode first, the fallback to the other mode
   {
@@ -154,21 +153,8 @@ FileData* SystemData::LookupOrCreateGame(RootFolderData& topAncestor, const Path
         }
         return game;
       }
-      else // Final folder (scraped obviously)
-      {
-        FolderData* folder = (FolderData*) item;
-        if (folder == nullptr)
-        {
-          // Create missing folder in both case, virtual or not
-          folder = new FolderData(Path(key), topAncestor);
-          doppelgangerWatcher[key] = folder;
-          treeNode->AddChild(folder, true);
-        }
-        return folder;
-      }
-    }
-    else // Intermediate path
-    {
+
+      // Final folder (scraped obviously)
       FolderData* folder = (FolderData*) item;
       if (folder == nullptr)
       {
@@ -177,8 +163,19 @@ FileData* SystemData::LookupOrCreateGame(RootFolderData& topAncestor, const Path
         doppelgangerWatcher[key] = folder;
         treeNode->AddChild(folder, true);
       }
-      treeNode = folder;
+      return folder;
     }
+
+    // Intermediate path
+    FolderData* folder = (FolderData*) item;
+    if (folder == nullptr)
+    {
+      // Create missing folder in both case, virtual or not
+      folder = new FolderData(Path(key), topAncestor);
+      doppelgangerWatcher[key] = folder;
+      treeNode->AddChild(folder, true);
+    }
+    treeNode = folder;
   }
 
   return nullptr;
@@ -255,11 +252,10 @@ void SystemData::ParseGamelistXml(RootFolderData& root, FileData::StringMap& dop
 
         // Force to hide ignored files
         const String fileName = path.Filename();
-        int p = (int)ignoreList.find(fileName);
-        if (p != (int)String::npos)
-          if (p > 0 && ignoreList[p-1] == ',')
-            if (ignoreList[p + fileName.length()] == ',')
-              continue;
+        int p = ignoreList.Find(fileName);
+        if (p > 0 && ignoreList[p-1] == ',')
+          if (ignoreList[p + fileName.length()] == ',')
+            continue;
 
         if (blacklist.contains(path.ToString()))
           continue;
@@ -339,7 +335,7 @@ void SystemData::UpdateGamelistXml()
          * At this point, we're sure at least one node has been updated (or added and updated).
          */
         Path xmlWritePath(getGamelistPath(*root, true));
-        xmlWritePath.Directory().CreatePath();
+        (void)xmlWritePath.Directory().CreatePath();
         mSystemManager.AddWatcherIgnoredFiles(xmlWritePath.ToString());
         document.save(Writer);
 
@@ -350,7 +346,7 @@ void SystemData::UpdateGamelistXml()
           Path xmlTruePath = xmlWritePath.ChangeExtension(".xml");
           if (zip.Add(Writer.mOutput, xmlTruePath.Filename()))
           {
-            xmlTruePath.Delete();
+            (void)xmlTruePath.Delete();
             { LOG(LogInfo) << "[Gamelist] Saved gamelist.zip for system " << FullName() << ". Updated items: " << fileList.size() << "/" << fileList.size(); }
           }
           else { LOG(LogError) << "[Gamelist] Failed to save " << xmlWritePath.ToString(); }
@@ -359,7 +355,7 @@ void SystemData::UpdateGamelistXml()
         {
           if (Files::SaveFile(xmlWritePath, Writer.mOutput))
           {
-            xmlWritePath.ChangeExtension(".zip").Delete();
+            (void)xmlWritePath.ChangeExtension(".zip").Delete();
             { LOG(LogInfo) << "[Gamelist] Saved gamelist.xml for system " << FullName() << ". Updated items: " << fileList.size() << "/" << fileList.size(); }
           }
           else { LOG(LogError) << "[Gamelist] Failed to save " << xmlWritePath.ToString(); }
@@ -389,6 +385,11 @@ bool SystemData::IsPorts() const
 bool SystemData::IsScreenshots() const
 {
     return (mProperties & Properties::ScreenShots) != 0;
+}
+
+bool SystemData::IsLastPlayed() const
+{
+  return (mSensitivity & MetadataType::LastPlayed) != 0;
 }
 
 bool SystemData::IsVirtual() const
@@ -506,10 +507,9 @@ FileData::List SystemData::getAllGames() const
   return result;
 }
 
-bool SystemData::HasVisibleGame(bool forceTateOnlyCheck) const
+bool SystemData::HasVisibleGame() const
 {
   FileData::TopLevelFilter filter = FileData::BuildTopLevelFilter();
-  if (forceTateOnlyCheck) filter |= FileData::TopLevelFilter::Tate;
   for(const RootFolderData* root : mRootOfRoot.SubRoots())
     if (root->HasVisibleGame(filter)) return true;
   return false;

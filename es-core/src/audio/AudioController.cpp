@@ -10,7 +10,7 @@ bool AudioController::GetSpecialAudio()
   bool result = false;
 
   // GPI audio configuration must not be changed
-  IniFile recalboxBootConf(Path("/boot/recalbox-boot.conf"), false);
+  IniFile recalboxBootConf(Path("/boot/recalbox-boot.conf"), false, true);
   if (recalboxBootConf.AsString("case") == "GPiV1:1") result = true;
 
   return result;

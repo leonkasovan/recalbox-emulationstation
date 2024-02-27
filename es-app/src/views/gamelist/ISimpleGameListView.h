@@ -5,6 +5,7 @@
 #include <components/TextComponent.h>
 #include "themes/ThemeExtras.h"
 #include "IArcadeGamelistInterface.h"
+#include "SlowDataInformation.h"
 #include <systems/SystemData.h>
 
 class SystemManager;
@@ -117,6 +118,18 @@ class ISimpleGameListView : public Gui
      * @return Region list (may be empty)
      */
     virtual Regions::List AvailableRegionsInGames() = 0;
+
+    /*!
+     * @brief Check if the current game (under cursor) has p2k file available
+     * @return True if at least one p2k file has been found
+     */
+    [[nodiscard]] virtual bool HasCurrentGameP2K() const = 0;
+
+    /*!
+     * @brief Gamelist may update thos information if required
+     * @param info
+     */
+    virtual void UpdateSlowData(const SlowDataInformation& info) = 0;
 
   protected:
     virtual void launch(FileData* game) = 0;

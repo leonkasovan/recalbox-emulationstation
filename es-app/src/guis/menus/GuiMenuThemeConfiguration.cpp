@@ -67,16 +67,23 @@ void GuiMenuThemeConfiguration::OptionListComponentChanged(int id, int index, co
   }
 }
 
-GuiMenuThemeConfiguration::OptionList GuiMenuThemeConfiguration::BuildSelector(const String& label, const String& help, const String& selected, const StringMaps & items, Components id, String& original)
+GuiMenuThemeConfiguration::OptionList GuiMenuThemeConfiguration::BuildSelector(const String& label, const String& help, const String& selected, const String::List& items, Components id, String& original)
 {
-  auto selectedColorSet = items.find(selected);
-  if (selectedColorSet == items.end()) selectedColorSet = items.begin();
-  if (!items.empty()) original = selectedColorSet->first;
+  // No option?
+  if (items.empty()) return nullptr;
 
+  bool found = false;
+  String realSelected;
+  for(const String& s : items) if (s == selected) { found = true; realSelected = s; break; }
+  if (!found) realSelected = items.front();
+  if (!items.empty()) original = realSelected;
+
+  // Build list
   std::vector<ListEntry<String>> list;
-  for (const auto& it : items)
-    list.push_back({ it.first, it.first, it.first == selectedColorSet->first });
-  std::sort(list.begin(), list.end(), [] (const ListEntry<String>& a, const ListEntry<String>& b) -> bool { return a.mText < b.mText; });
+  for (const String& s : items) list.push_back({ s, s, s == realSelected });
+  // Try numeric sorting, else  use an alphanumeric sort
+  if (!TrySortNumerically(list))
+    std::sort(list.begin(), list.end(), [] (const ListEntry<String>& a, const ListEntry<String>& b) -> bool { return a.mText < b.mText; });
 
   if (!items.empty())
   {
@@ -84,4 +91,19 @@ GuiMenuThemeConfiguration::OptionList GuiMenuThemeConfiguration::BuildSelector(c
     return optionList;
   }
   return nullptr;
+}
+
+bool GuiMenuThemeConfiguration::TrySortNumerically(std::vector<ListEntry<String>>& list)
+{
+  HashMap<String, int> nameToNumeric;
+  for(const ListEntry<String>& item : list)
+  {
+    if (item.mText.empty()) return false;
+    size_t pos = item.mText.find_first_not_of("0123456789");
+    if (pos == 0) return false;
+    nameToNumeric[item.mText] = (pos == std::string::npos) ? item.mText.AsInt() : item.mText.AsInt(item.mText[pos]);
+  }
+
+  std::sort(list.begin(), list.end(), [&nameToNumeric] (const ListEntry<String>& a, const ListEntry<String>& b) -> bool { return nameToNumeric[a.mText] < nameToNumeric[b.mText]; });
+  return true;
 }

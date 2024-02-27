@@ -77,8 +77,8 @@ void MappingConfiguration::Load(const Path& path, bool folder)
       String value = content.SubString(equal + 1, end - (equal + 1)).Trim();
       // Extract comment if any
       String comment;
-      int commentPos = (int)value.find(";;");
-      if (commentPos != (int)String::npos)
+      int commentPos = (int)value.Find(";;");
+      if (commentPos >= 0)
       {
         comment = value.SubString(commentPos + 2).Trim();
         value = value.SubString(0, commentPos).Trim();
@@ -376,7 +376,7 @@ bool MappingConfiguration::ParseKeyCode(const String& value, Mapping::CodeArray 
 
   memset(codes, 0, sizeof(Mapping::CodeArray));
 
-  bool isMulti = value.find(' ') !=  String::npos;
+  bool isMulti = value.Find(' ') >= 0;
 
   if (!isMulti) // Simple c& most common case
   {

@@ -26,10 +26,10 @@ class IArcadeGamelistInterface
     [[nodiscard]] virtual bool HasValidDatabase() const = 0;
 
     /*!
-     * @brief Get driver list (arcade view only)
-     * @return Driver list
+     * @brief Get manufacturer list (arcade view only)
+     * @return Manufacturer list
      */
-    [[nodiscard]] virtual std::vector<ArcadeDatabase::Driver> GetDriverList() const = 0;
+    [[nodiscard]] virtual std::vector<ArcadeDatabase::Manufacturer> GetManufacturerList() const = 0;
 
     /*!
      * @brief Get the current emulator name for the current folder
@@ -44,14 +44,14 @@ class IArcadeGamelistInterface
     [[nodiscard]] virtual String GetCurrentCoreName() const = 0;
 
     /*!
-     * @brief Get the number of games attached to the given driver, in the current gamalist
-     * @param driverIndex Driver index
+     * @brief Get the number of games attached to the given manufacturer, in the current gamelist
+     * @param manufacturerIndex Manufacturer index
      * @return Game count
      */
-    [[nodiscard]] virtual int GetGameCountForDriver(int driverIndex) const = 0;
+    [[nodiscard]] virtual int GetGameCountForManufacturer(int manufacturerIndex) const = 0;
 
     /*!
-     * @brief Check if there is more than one driver so that they can be filtered by the user
+     * @brief Check if there is more than one manufacturer so that they can be filtered by the user
      * @return
      */
     [[nodiscard]] virtual bool CanBeFiltered() const = 0;

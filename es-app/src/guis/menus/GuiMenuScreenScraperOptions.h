@@ -62,7 +62,7 @@ class GuiMenuScreenScraperOptions : public GuiMenuBase
     void OptionListComponentChanged(int id, int index, const Regions::GameRegions& value) override;
     void OptionListComponentChanged(int id, int index, const Languages& value) override;
 
-    void SwitchComponentChanged(int id, bool status) override;
+    void SwitchComponentChanged(int id, bool& status) override;
 
     //! Get login regarding scraper type
     String GetLogin();

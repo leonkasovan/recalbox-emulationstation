@@ -11,6 +11,7 @@
 GuiInputConfig::~GuiInputConfig()
 {
   mTargetDevice->SetConfiguringState(false);
+  InputManager::Instance().RemoveNotificationInterface(this);
 }
 
 GuiInputConfig::GuiInputConfig(WindowManager&window, InputDevice* target, const std::function<void()>& doneCallback)
@@ -23,6 +24,7 @@ GuiInputConfig::GuiInputConfig(WindowManager&window, InputDevice* target, const 
   , mActiveHats(0)
   , mNeutralPositionSet(false)
   , mCursorOnList(true)
+  , mFirstEventReceived(true)
 {
   mTargetDevice->SetConfiguringState(true);
   { LOG(LogInfo) << "[GuiInput] Configuring device " << mTargetDevice->Index() << " (" << mTargetDevice->Name() << ")."; }
@@ -48,7 +50,7 @@ GuiInputConfig::GuiInputConfig(WindowManager&window, InputDevice* target, const 
 
   String deviceName = _("KEYBOARD");
   if (mTargetDevice->Identifier() != InputEvent::sKeyboardDevice)
-    deviceName = _("GAMEPAD %i").Replace("%i", String(mTargetDevice->Index() + 1));
+    deviceName = _("GAMEPAD %i").Replace("%i", mTargetDevice->Name());
 
   mSubtitle1 = std::make_shared<TextComponent>(mWindow, deviceName.UpperCaseUTF8(), menuTheme->menuText.font, menuTheme->menuFooter.color, TextAlignment::Center);
   mGrid.setEntry(mSubtitle1, Vector2i(0, 1), false, true);
@@ -138,6 +140,8 @@ GuiInputConfig::GuiInputConfig(WindowManager&window, InputDevice* target, const 
   float height = Renderer::Instance().Is480pOrLower() ? Renderer::Instance().DisplayHeightAsFloat() * 0.70f : Renderer::Instance().DisplayHeightAsFloat() * 0.85f;
   setSize(width, height);
   setPosition((Renderer::Instance().DisplayWidthAsFloat() - mSize.x()) / 2, (Renderer::Instance().DisplayHeightAsFloat() - mSize.y()) / 2);
+
+  InputManager::Instance().AddNotificationInterface(this);
 }
 
 void GuiInputConfig::initFormInputs()
@@ -338,6 +342,13 @@ bool GuiInputConfig::EventReceived(int id, const InputCompactEvent& event)
   if(&event.Device() != mTargetDevice)
     return false;
 
+  // 8bitdo DInput bug
+  if (mFirstEventReceived)
+  {
+    event.Device().RecordAxisNeutralPosition();
+    mFirstEventReceived = false;
+  }
+
   // Neutral position has been reached?
   if (!mNeutralPositionSet)
   {
@@ -349,10 +360,6 @@ bool GuiInputConfig::EventReceived(int id, const InputCompactEvent& event)
   RecordRawInput(event.RawEvent());
   if (!mEventList.empty() && NeutralPosition())
     ProcessEvents();
-
-  /*if (event.RawEvent().AnythingPressed()) // Something was pressed/moved
-    if (!mInputStack.hasInput(event.RawEvent()))
-      mInputStack.push(event.RawEvent());*/
 
   return true;
 }
@@ -480,6 +487,8 @@ void GuiInputConfig::RecordRawInput(const InputEvent& raw)
     }
     case InputEvent::EventType::Unknown:
     case InputEvent::EventType::Key:
+    case InputEvent::EventType::MouseButton:
+    case InputEvent::EventType::MouseWheel:
     default: break;
   }
 }

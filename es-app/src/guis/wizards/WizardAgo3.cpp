@@ -48,7 +48,7 @@ String WizardAgo3::OnTextRequired(int page)
   return String();
 }
 
-Wizard::Move WizardAgo3::OnKeyReceived(int page, const InputCompactEvent& event)
+SimpleWizardBase::Move WizardAgo3::OnKeyReceived(int page, const InputCompactEvent& event)
 {
   if (event.CancelPressed()) return Move::Backward;
 

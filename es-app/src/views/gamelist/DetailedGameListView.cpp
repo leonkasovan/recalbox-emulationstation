@@ -1,9 +1,7 @@
 #include <RecalboxConf.h>
 #include <VideoEngine.h>
 #include "views/gamelist/DetailedGameListView.h"
-#include "views/ViewController.h"
 #include "animations/LambdaAnimation.h"
-#include "utils/locale/LocaleHelper.h"
 #include "scraping/ScraperSeamless.h"
 #include "recalbox/RecalboxStorageWatcher.h"
 
@@ -41,6 +39,8 @@ DetailedGameListView::DetailedGameListView(WindowManager&window, SystemManager& 
   , mBusy(window)
   , mSettings(RecalboxConf::Instance())
   , mFadeBetweenImage(-1)
+  , mLastCursorItem(nullptr)
+  , mLastCursorItemHasP2K(false)
 {
 }
 
@@ -66,12 +66,13 @@ void DetailedGameListView::Initialize()
   mList.setAlignment(HorizontalAlignment::Left);
 
   // folder components
-  for (int i = 3 * 3; --i >= 0; )
+  for (int i = sFoldersMaxGameImageCount; --i >= 0; )
   {
     auto* img = new ImageComponent(mWindow);
     addChild(img); // normalised functions required to be added first
     img->setOrigin(0.5f, 0.5f);
-    img->setNormalisedMaxSize(0.4f, 0.4f);
+    img->setNormalisedSize(0.4f, 0.4f);
+    img->setKeepRatio(true),
     img->setDefaultZIndex(30);
     img->setZIndex(30);
     mFolderContent.push_back(img);
@@ -83,13 +84,15 @@ void DetailedGameListView::Initialize()
   // image
   mImage.setOrigin(0.5f, 0.5f);
   mImage.setPosition(mSize.x() * 0.25f, mList.getPosition().y() + mSize.y() * 0.2125f);
-  mImage.setMaxSize(mSize.x() * (0.50f - 2 * padding), mSize.y() * 0.4f);
+  mImage.setResize(mSize.x() * (0.50f - 2 * padding), mSize.y() * 0.4f);
+  mImage.setKeepRatio(true);
   mImage.setDefaultZIndex(30);
 
   // no image
   mNoImage.setOrigin(mImage.getOrigin());
   mNoImage.setPosition(mImage.getPosition());
-  mNoImage.setMaxSize(mImage.getSize());
+  mNoImage.setResize(mImage.getSize());
+  mNoImage.setKeepRatio(true);
   mNoImage.setDefaultZIndex(30);
 
   addChild(&mNoImage);
@@ -100,6 +103,8 @@ void DetailedGameListView::Initialize()
   mVideo.setPosition(mSize.x() * 0.25f, mList.getPosition().y() + mSize.y() * 0.2125f);
   mVideo.setMaxSize(mSize.x() * (0.50f - 2 * padding), mSize.y() * 0.4f);
   mVideo.setDefaultZIndex(30);
+  mVideo.LinkComponent(&mImage);
+  mVideo.LinkComponent(&mNoImage);
   addChild(&mVideo);
 
   // Busy
@@ -279,7 +284,8 @@ void DetailedGameListView::onThemeChanged(const ThemeData& theme)
       for (unsigned int y = 0; y < grid; y++)
       {
         ImageComponent* img = mFolderContent[x + y * grid];
-        img->setMaxSize(imgSize, imgSize);
+        img->setResize(imgSize, imgSize);
+        img->setKeepRatio(true);
         img->setPosition(left + imgSize * img->getOrigin().x() + (float)x * (1 + relativeMarge) * imgSize,
                          top + imgSize * img->getOrigin().y() + (float)y * (1 + relativeMarge) * imgSize);
         img->setZIndex(30);
@@ -294,23 +300,19 @@ void DetailedGameListView::initMDLabels()
 {
   std::vector<TextComponent*> components = getMDLabels();
 
-  const unsigned int colCount = 2;
+  //const unsigned int colCount = 2;
   const unsigned int rowCount = (unsigned int) (components.size() / 2);
 
   Vector3f start(mSize.x() * 0.01f, mSize.y() * 0.625f, 0.0f);
 
-  const float colSize = (mSize.x() * 0.48f) / colCount;
+  //const float colSize = (mSize.x() * 0.48f) / colCount;
   const float rowPadding = 0.01f * mSize.y();
 
+  Vector3f pos = start + Vector3f(0, 0, 0);
   for (unsigned int i = 0; i < (unsigned int)components.size(); i++)
   {
     const unsigned int row = i % rowCount;
-    Vector3f pos(0.0f, 0.0f, 0.0f);
-    if (row == 0)
-    {
-      pos = start + Vector3f(colSize * ((float)i / (float)rowCount), 0, 0);
-    }
-    else
+    if (row != 0)
     {
       // work from the last component
       Component* lc = components[i - 1];
@@ -362,6 +364,7 @@ void DetailedGameListView::DoUpdateGameInformation(bool update)
 {
   FileData* file = (mList.size() == 0 || mList.isScrolling()) ? nullptr : mList.getSelected();
 
+  // Reset null game
   if (file == nullptr)
   {
     VideoEngine::Instance().StopVideo(false);
@@ -382,9 +385,10 @@ void DetailedGameListView::DoUpdateGameInformation(bool update)
     {
        if (isFolder)
        {
-         setFolderInfo((FolderData*) file);
          for(int i = (int)mRegions.size(); --i >= 0; )
            mRegions[i]->setImage(Path());
+         if (file != mLastCursorItem)
+           ViewController::Instance().FetchSlowDataFor(file);
        }
        else
         setGameInfo(file, update);
@@ -392,7 +396,20 @@ void DetailedGameListView::DoUpdateGameInformation(bool update)
     }
   }
 
+  // Reset p2k status (except if the last item is the same
+  if (file != mLastCursorItem) mLastCursorItemHasP2K = false;
   mWindow.UpdateHelpSystem();
+  // Update p2k status
+  if (file != nullptr && file != mLastCursorItem)
+  {
+    if (file->IsGame())
+      ViewController::Instance().FetchSlowDataFor(file);
+    else if (file->IsFolder()) // Kill video on multi-thumbnail folder
+      mVideo.setVideo(Path::Empty, 0, 0);
+  }
+
+  // Update last procesed item
+  mLastCursorItem = file;
 }
 
 bool DetailedGameListView::switchToFolderScrapedDisplay()
@@ -446,30 +463,14 @@ std::vector<Component*> DetailedGameListView::getScrapedFolderComponents()
   return comps;
 }
 
-void DetailedGameListView::setFolderInfo(FolderData* folder)
+void DetailedGameListView::SetFolderInfo(FolderData* folder, int count, const FolderImagesPath& path)
 {
-  FileData::List games = folder->GetAllDisplayableItemsRecursively(false, folder->System().Excludes());
-  String gameCount(_N("%i GAME AVAILABLE", "%i GAMES AVAILABLE", (int)games.size()));
-  gameCount.Replace("%i", String((int)games.size()));
+  String gameCount(_N("%i GAME AVAILABLE", "%i GAMES AVAILABLE", count));
+  gameCount.Replace("%i", String(count));
   mFolderName.setText(folder->Name() + " - " + gameCount);
 
-  unsigned char idx = 0;
-
-  for (FileData* game : games)
-  {
-    if (game->HasThumbnailOrImage())
-    {
-      mFolderContent[idx]->setImage(game->ThumbnailOrImagePath());
-      if (++idx == mFolderContent.size())
-        break;
-    }
-  }
-  for (int i = idx; i < (int) mFolderContent.size(); i++)
-  {
-    mFolderContent[i]->setImage(Path());
-  }
-  // Kill video on multi-thumbnail folder
-  mVideo.setVideo(Path::Empty, 0, 0);
+  for (int i = sFoldersMaxGameImageCount; --i >= 0;)
+    mFolderContent[i]->setImage(path[i]);
 }
 
 void DetailedGameListView::SetImageFading(FileData* game, bool update)
@@ -514,7 +515,8 @@ void DetailedGameListView::setGameInfo(FileData* file, bool update)
     setRegions(file);
 
   mRating.setValue(file->Metadata().RatingAsString());
-  mReleaseDate.setValue(file->Metadata().ReleaseDate());
+  if (file->Metadata().ReleaseDateEpoc() != 0) mReleaseDate.setValue(file->Metadata().ReleaseDate());
+  else mReleaseDate.setValue(_("UNKNOWN"));
   mDeveloper.setValue(file->Metadata().Developer().empty() ? _("UNKNOWN") : file->Metadata().Developer());
   mPublisher.setValue(file->Metadata().Publisher().empty() ? _("UNKNOWN") : file->Metadata().Publisher());
   mGenre.setValue(file->Metadata().Genre().empty() ? _("NONE") : file->Metadata().Genre());
@@ -578,7 +580,7 @@ void DetailedGameListView::launch(FileData* game)
   if (mImage.hasImage())
     target.Set(mImage.getCenter().x(), mImage.getCenter().y(), 0);
 
-  ViewController::Instance().Launch(game, GameLinkedData(), target);
+  ViewController::Instance().Launch(game, GameLinkedData(), target, false);
 }
 
 // element order need to follow the one in onThemeChanged
@@ -842,7 +844,8 @@ void DetailedGameListView::populateList(const FolderData& folder)
   FileSorts::SortSets set = mSystem.IsVirtual() ? FileSorts::SortSets::MultiSystem :
                             mSystem.Descriptor().IsArcade() ? FileSorts::SortSets::Arcade :
                             FileSorts::SortSets::SingleSystem;
-  FileSorts::Sorts sort = FileSorts::Clamp(RecalboxConf::Instance().GetSystemSort(mSystem), set);
+  FileSorts::Sorts sort = mSystem.IsSelfSorted() ? mSystem.FixedSort() :
+                          FileSorts::Clamp(RecalboxConf::Instance().GetSystemSort(mSystem), set);
   FolderData::Sort(items, FileSorts::Comparer(sort), FileSorts::IsAscending(sort));
 
   // Region filtering?
@@ -1016,4 +1019,19 @@ void DetailedGameListView::RefreshItem(FileData* game)
   if (index < 0) { LOG(LogError) << "[DetailedGameListView] Trying to refresh a not found item"; return; }
   mList.changeTextAt(index, GetDisplayName(*game));
   if (mList.getCursorIndex() == index) DoUpdateGameInformation(true);
+}
+
+void DetailedGameListView::UpdateSlowData(const SlowDataInformation& info)
+{
+  if (info.mItem == getCursor())
+  {
+    // Game? update p2k status
+    if (info.mItem->IsGame())
+    {
+      mLastCursorItemHasP2K = info.mHasP2k;
+      mWindow.UpdateHelpSystem();
+    }
+    else if (info.mItem->IsFolder())
+      SetFolderInfo((FolderData*)info.mItem, info.mCount, *info.mPathList);
+  }
 }

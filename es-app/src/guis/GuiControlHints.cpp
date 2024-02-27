@@ -3,6 +3,7 @@
 //
 
 #include "GuiControlHints.h"
+#include "components/TextScrollComponent.h"
 #include <padtokeyboard/pad/PadItems.h>
 #include <padtokeyboard/pad/MappingConfiguration.h>
 #include <utils/storage/HashMap.h>
@@ -62,13 +63,13 @@ static const char* IconPathMap(PadItems padItems)
       { PadItems::HotKeyR3,          ":/help/button_r3.svg" },
       { PadItems::HotKeyStart,       ":/help/button_start.svg" },
       { PadItems::HotKeyJ1Up,        ":/help/joystick_up_L.svg" },
-      { PadItems::HotKeyJ1Right,     ":/help/joystick_down_L.svg" },
-      { PadItems::HotKeyJ1Down,      ":/help/joystick_left_L.svg" },
-      { PadItems::HotKeyJ1Left,      ":/help/joystick_right_L.svg" },
+      { PadItems::HotKeyJ1Down,      ":/help/joystick_down_L.svg" },
+      { PadItems::HotKeyJ1Left,      ":/help/joystick_left_L.svg" },
+      { PadItems::HotKeyJ1Right,     ":/help/joystick_right_L.svg" },
       { PadItems::HotKeyJ2Up,        ":/help/joystick_up_R.svg" },
-      { PadItems::HotKeyJ2Right,     ":/help/joystick_down_R.svg" },
-      { PadItems::HotKeyJ2Down,      ":/help/joystick_left_R.svg" },
-      { PadItems::HotKeyJ2Left,      ":/help/joystick_right_R.svg" },
+      { PadItems::HotKeyJ2Down,      ":/help/joystick_down_R.svg" },
+      { PadItems::HotKeyJ2Left,      ":/help/joystick_left_R.svg" },
+      { PadItems::HotKeyJ2Right,     ":/help/joystick_right_R.svg" },
     };
   return sIconPathMap.get_or_return_default(padItems);
 }
@@ -118,13 +119,13 @@ static String IconTextMap(PadItems padItems, int pad)
       { PadItems::HotKeyR3,          _("HOTKEY").Append('+').Append("R3") },
       { PadItems::HotKeyStart,       _("HOTKEY").Append('+').Append("START") },
       { PadItems::HotKeyJ1Up,        _("HOTKEY").Append('+').Append(_("J1 UP")) },
-      { PadItems::HotKeyJ1Right,     _("HOTKEY").Append('+').Append(_("J1 DOWN")) },
-      { PadItems::HotKeyJ1Down,      _("HOTKEY").Append('+').Append(_("J1 LEFT")) },
-      { PadItems::HotKeyJ1Left,      _("HOTKEY").Append('+').Append(_("J1 RIGHT")) },
+      { PadItems::HotKeyJ1Down,      _("HOTKEY").Append('+').Append(_("J1 DOWN")) },
+      { PadItems::HotKeyJ1Left,      _("HOTKEY").Append('+').Append(_("J1 LEFT")) },
+      { PadItems::HotKeyJ1Right,     _("HOTKEY").Append('+').Append(_("J1 RIGHT")) },
       { PadItems::HotKeyJ2Up,        _("HOTKEY").Append('+').Append(_("J2 UP")) },
-      { PadItems::HotKeyJ2Right,     _("HOTKEY").Append('+').Append(_("J2 DOWN")) },
-      { PadItems::HotKeyJ2Down,      _("HOTKEY").Append('+').Append(_("J2 LEFT")) },
-      { PadItems::HotKeyJ2Left,      _("HOTKEY").Append('+').Append(_("J2 RIGHT")) },
+      { PadItems::HotKeyJ2Down,      _("HOTKEY").Append('+').Append(_("J2 DOWN")) },
+      { PadItems::HotKeyJ2Left,      _("HOTKEY").Append('+').Append(_("J2 LEFT")) },
+      { PadItems::HotKeyJ2Right,     _("HOTKEY").Append('+').Append(_("J2 RIGHT")) },
     };
 
   String result(sIconTextMap.get_or_return_default(padItems));
@@ -202,7 +203,7 @@ GuiControlHints::GuiControlHints(WindowManager& window, const Path& romPath)
     icon->setColorShift(menuTheme->menuText.color);
     mGrid.setEntry(icon, { currentCol * 5 + 3, currentRow + 2}, false, false, { 1, 1});
 
-    std::shared_ptr<TextComponent> text = std::make_shared<TextComponent>(window, *comment, menuTheme->menuText.font, menuTheme->menuText.color, TextAlignment::Left);
+    std::shared_ptr<TextScrollComponent> text = std::make_shared<TextScrollComponent>(window, *comment, menuTheme->menuText.font, menuTheme->menuText.color, TextAlignment::Left);
     mGrid.setEntry(text, { currentCol * 5 + 5, currentRow + 2}, false, true, { 1, 1});
 
     if (++currentRow >= mRows)
@@ -241,7 +242,7 @@ void GuiControlHints::onSizeChanged()
   mGrid.setColWidthPerc(mColumns * 5 + 1, 0.02, false);
   for(int i = mColumns; --i >= 0; )
   {
-    mGrid.setColWidthPerc(i * 5 + 1, iconPercent * 2, false);
+    mGrid.setColWidthPerc(i * 5 + 1, iconPercent * 3, false);
     mGrid.setColWidthPerc(i * 5 + 2, 0.02, false);
     mGrid.setColWidthPerc(i * 5 + 3, iconPercent, false);
     mGrid.setColWidthPerc(i * 5 + 4, 0.02, false);

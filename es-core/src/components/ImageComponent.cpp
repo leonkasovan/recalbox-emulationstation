@@ -12,13 +12,12 @@ Vector2i ImageComponent::getTextureSize() const {
     return Vector2i::Zero();
 }
 
-ImageComponent::ImageComponent(WindowManager&window, bool forceLoad, bool dynamic)
+ImageComponent::ImageComponent(WindowManager&window, bool keepRatio, const Path& imagePath, bool forceLoad, bool dynamic)
   : Component(window)
   , mTargetSize(0, 0)
-  , mPath()
+  , mPath(imagePath)
   , mFlipX(false)
   , mFlipY(false)
-  , mTargetIsMax(false)
   , mVertices{ { { 0, 0 }, { 0, 0 } } }
   , mColors{ 0 }
   , mColorShift(0xFFFFFFFF)
@@ -29,7 +28,9 @@ ImageComponent::ImageComponent(WindowManager&window, bool forceLoad, bool dynami
   , mForceLoad(forceLoad)
   , mDynamic(dynamic)
   , mVisible(true)
+  , mKeepRatio(keepRatio)
 {
+  if (!imagePath.IsEmpty()) setImage(imagePath);
   updateColors();
 }
 
@@ -51,7 +52,7 @@ void ImageComponent::resize() {
         // (you'll see this scattered throughout the function)
         // this is probably not the best way, so if you're familiar with this problem and have a better solution, please make a pull request!
 
-        if (mTargetIsMax) {
+        if (mKeepRatio) {
             mSize = textureSize;
 
             Vector2f resizeScale((mTargetSize.x() / mSize.x()), (mTargetSize.y() / mSize.y()));
@@ -129,19 +130,12 @@ void ImageComponent::setImage(const std::shared_ptr<TextureResource>& texture) {
 
 void ImageComponent::setResize(float width, float height) {
     mTargetSize.Set(width, height);
-    mTargetIsMax = false;
     resize();
 }
 
-void ImageComponent::setMaxSize(float width, float height) {
-    mTargetSize.Set(width, height);
-    mTargetIsMax = true;
-    resize();
-}
-
-void ImageComponent::setNormalisedMaxSize(float width, float height) {
+void ImageComponent::setNormalisedSize(float width, float height) {
     Vector2f pos = denormalise(width, height);
-    setMaxSize(pos.x(), pos.y());
+    setSize(pos.x(), pos.y());
 }
 
 void ImageComponent::setFlipX(bool flip) {
@@ -320,8 +314,10 @@ void ImageComponent::applyTheme(const ThemeData& theme, const String& view, cons
     if (hasFlag(properties,ThemeProperties::Size)) {
         if (elem->HasProperty("size")) {
             setResize(elem->AsVector("size") * scale);
+            setKeepRatio(false);
         } else if (elem->HasProperty("maxSize")) {
-            setMaxSize(elem->AsVector("maxSize") * scale);
+            setResize(elem->AsVector("maxSize") * scale);
+            setKeepRatio(true);
         }
     }
 

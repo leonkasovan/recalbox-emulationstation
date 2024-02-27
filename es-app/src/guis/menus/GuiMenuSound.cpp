@@ -117,7 +117,8 @@ void GuiMenuSound::SliderMoved(int id, float value)
   if ((Components)id == Components::Volume && AudioController::Instance().GetVolume() != Math::roundi(value))
   {
     AudioController::Instance().SetVolume(Math::roundi(value));
-    RecalboxConf::Instance().SetAudioVolume(Math::roundi(value)).Save();
+    if (RecalboxConf::Instance().GetAudioVolume() != Math::roundi(value))
+      RecalboxConf::Instance().SetAudioVolume(Math::roundi(value)).Save();
   }
 }
 

@@ -21,7 +21,7 @@ class SuperGameBoyData
     [[nodiscard]] String Core(const FileData& game, const String& defaultCore) const
     {
       // Change to mgba if user did not overload the core for gameboy
-      if (!game.System().Manager().Emulators().ConfigOverloaded(game))
+      if (!EmulatorManager::ConfigOverloaded(game))
         return "mgba";
       else
         return defaultCore;

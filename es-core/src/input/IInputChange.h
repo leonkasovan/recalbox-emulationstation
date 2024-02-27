@@ -12,6 +12,7 @@ class IInputChange
     /*!
      * @brief Called by the InputManager right after the device list is refreshed
      * because of a pad added or removed
+     * @param True if a pad has been removed, false if a pad has been added
      */
-    virtual void PadsAddedOrRemoved() = 0;
+    virtual void PadsAddedOrRemoved(bool removed) = 0;
 };

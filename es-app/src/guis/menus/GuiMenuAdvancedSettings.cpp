@@ -13,6 +13,8 @@
 #include "GuiMenuCRT.h"
 #include "GuiMenuResolutionSettings.h"
 #include "ResolutionAdapter.h"
+#include "hardware/RPiEepromUpdater.h"
+#include "views/MenuFilter.h"
 #include <guis/MenuMessages.h>
 #include <utils/locale/LocaleHelper.h>
 //#include <components/OptionListComponent.h>
@@ -77,8 +79,15 @@ GuiMenuAdvancedSettings::GuiMenuAdvancedSettings(WindowManager& window, SystemMa
   // framerate
   AddSwitch(_("SHOW FRAMERATE"), RecalboxConf::Instance().GetGlobalShowFPS(), (int)Components::ShowFPS, this, _(MENUMESSAGE_ADVANCED_FRAMERATE_HELP_MSG));
 
+  // framerate
+  AddSwitch(_("ENABLE BOOT ON GAME"), RecalboxConf::Instance().GetAutorunEnabled(), (int)Components::AutorunEnabled, this, _(MENUMESSAGE_ADVANCED_AUTORUN_HELP_MSG));
+
   // Recalbox Manager
   AddSwitch(_("RECALBOX MANAGER"), RecalboxConf::Instance().GetSystemManagerEnabled(), (int)Components::Manager, this, _(MENUMESSAGE_ADVANCED_MANAGER_HELP_MSG));
+
+  // Eeprom update
+  if(MenuFilter::ShouldDisplayMenuEntry(MenuFilter::PiEeprom))
+    AddSubMenu(_("BOOTLOADER UPDATE"), (int)Components::EepromUpdate, _(MENUMESSAGE_ADVANCED_EEPROM_UPDATE));
 
   // Reset Factory
   AddSubMenu(_("RESET TO FACTORY SETTINGS"), (int)Components::FactoryReset, _(MENUMESSAGE_ADVANCED_FACTORY_RESET));
@@ -141,15 +150,18 @@ GuiMenuAdvancedSettings::OverclockList GuiMenuAdvancedSettings::AvailableOverclo
     case BoardType::Pi3plus: boardFolder = "rpi3plus"; break;
     case BoardType::Pi4: boardFolder = "rpi4"; break;
     case BoardType::Pi400: boardFolder = "rpi400"; break;
+    case BoardType::Pi5: boardFolder = "rpi5"; break;
     case BoardType::UndetectedYet:
     case BoardType::Unknown:
     case BoardType::UnknownPi:
     case BoardType::OdroidAdvanceGo:
     case BoardType::OdroidAdvanceGoSuper:
+    case BoardType::RG351P:
     case BoardType::RG353P:
     case BoardType::RG353V:
     case BoardType::RG353M:
     case BoardType::RG503:
+    case BoardType::RG351V:
     case BoardType::PCx86:
     case BoardType::PCx64: break;
   }
@@ -217,7 +229,7 @@ void GuiMenuAdvancedSettings::OptionListComponentChanged(int id, int index, cons
   }
 }
 
-void GuiMenuAdvancedSettings::SwitchComponentChanged(int id, bool status)
+void GuiMenuAdvancedSettings::SwitchComponentChanged(int id, bool& status)
 {
   switch ((Components)id)
   {
@@ -235,6 +247,14 @@ void GuiMenuAdvancedSettings::SwitchComponentChanged(int id, bool status)
     }
     case Components::ShowFPS: RecalboxConf::Instance().SetGlobalShowFPS(status).Save(); break;
     case Components::Manager: RecalboxConf::Instance().SetSystemManagerEnabled(status).Save(); break;
+    case Components::AutorunEnabled:
+    {
+      RecalboxConf::Instance().SetAutorunEnabled(status).Save();
+      if(status)
+        mWindow.pushGui(
+          new GuiMsgBox(mWindow, _("If no configured controller is detected at boot, recalbox will run as usual and display the system list."), _("OK")));
+      break;
+    }
     case Components::OverclockList:
     case Components::BootSubMenu:
     case Components::VirtualSubMenu:
@@ -245,6 +265,7 @@ void GuiMenuAdvancedSettings::SwitchComponentChanged(int id, bool status)
     case Components::FactoryReset:
     case Components::CrtSubMenu:
     case Components::ResolutionSubMenu:
+    case Components::EepromUpdate:
     default: break;
   }
 }
@@ -254,20 +275,55 @@ void GuiMenuAdvancedSettings::SubMenuSelected(int id)
   switch ((Components)id)
   {
     case Components::BootSubMenu: mWindow.pushGui(new GuiMenuBootSettings(mWindow, mSystemManager)); break;
-    case Components::CrtSubMenu: mWindow.pushGui(new GuiMenuCRT(mWindow)); break;
-    case Components::VirtualSubMenu: mWindow.pushGui(new GuiMenuVirtualSystems(mWindow)); break;
+    case Components::CrtSubMenu: mWindow.pushGui(new GuiMenuCRT(mWindow, Board::Instance().CrtBoard().GetCrtAdapter() == CrtAdapterType::RGBJamma ? _("JAMMA SETTINGS") : _("CRT SETTINGS"))); break;
+    case Components::VirtualSubMenu: mWindow.pushGui(new GuiMenuVirtualSystems(mWindow, mSystemManager)); break;
     case Components::AdvancedSubMenu: mWindow.pushGui(new GuiMenuSystemList(mWindow, mSystemManager)); break;
     case Components::KodiSubMenu: mWindow.pushGui(new GuiMenuKodiSettings(mWindow)); break;
     case Components::ResolutionSubMenu: mWindow.pushGui(new GuiMenuResolutionSettings(mWindow, mSystemManager)); break;
     case Components::FactoryReset: ResetFactory(); break;
+    case Components::EepromUpdate: EepromUpdate(); break;
     case Components::OverclockList:
     case Components::Overscan:
     case Components::ShowFPS:
+    case Components::AutorunEnabled:
     case Components::SecuritySubMenu:
     case Components::Manager:
     case Components::DebugLogs:
     case Components::Cases:
     default: break;
+  }
+}
+
+void GuiMenuAdvancedSettings::EepromUpdate()
+{
+  RPiEepromUpdater updater;
+  if(updater.Error())
+  {
+    mWindow.pushGui(new GuiMsgBox(mWindow, _("Could not get bootloader status. Something went wrong"), _("OK"), nullptr));
+    return;
+  }
+  if(updater.IsUpdateAvailable())
+  {
+    mWindow.pushGui(new GuiMsgBox(mWindow, _("An update is available :\n").Append(_("Current version: \n")).Append(updater.CurrentVersion()).Append(_("\nLatest version: \n")).Append(updater.LastVersion()),
+                                  _("UPDATE"), [this, updater]{
+                                                { LOG(LogInfo) << "[EepromUpdate] Processing UPDATE to " << updater.LastVersion(); }
+                                                if(updater.Update())
+                                                {
+                                                  mWindow.pushGui(
+                                                    new GuiMsgBox(mWindow, _("Update success. The bootloader is up to date."), _("OK"), [&]{ RequestReboot(); }));
+                                                  { LOG(LogInfo) << "[EepromUpdate] Update success to " << updater.LastVersion(); }
+                                                }
+                                                else
+                                                {
+                                                  mWindow.pushGui(new GuiMsgBox(mWindow, _("Could not update bootloader. Something went wrong"), _("OK"), nullptr));
+                                                  { LOG(LogError) << "[EepromUpdate] Unable to update to " << updater.LastVersion(); }
+                                                }
+                                              },
+                                  _("CANCEL"), nullptr));
+  }
+  else
+  {
+    mWindow.pushGui(new GuiMsgBox(mWindow, _("Your bootloader is up to date.\nThe bootloader version is:\n").Append(updater.CurrentVersion()), _("OK"), nullptr));
   }
 }
 
@@ -310,7 +366,7 @@ void GuiMenuAdvancedSettings::DoResetFactory()
     if (system(String("rm -rf ").Append(path).data()) != 0)
     { LOG(LogError) << "[ResetFactory] Error removing folder " << path; }
 
-  IniFile recalboxBoot(Path("/boot/recalbox-boot.conf"), false);
+  IniFile recalboxBoot(Path("/boot/recalbox-boot.conf"), false, true);
   // Reset rotation
   recalboxBoot.SetString("screen.rotation", "0");
   // Special case for rpizero plus GPiCase2W, that cannot be detected. Can be removed after the rpizero image is frozen

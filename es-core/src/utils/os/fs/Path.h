@@ -95,10 +95,7 @@ class Path
      * @brief Copy constructor from another path
      * @param path source path
      */
-    Path(const Path& path)
-      : mPath(path.mPath)
-    {
-    }
+    Path(const Path& path) = default;
 
     /*!
      * @brief Move constructor from another path
@@ -147,7 +144,7 @@ class Path
      * @param index index of the path component to extract
      * @return path component or empty string
      */
-    String Item(int index) const;
+    [[nodiscard]] String Item(int index) const;
 
     /*!
      * @brief Return path from the first component up to the component at index n of the current path.
@@ -155,7 +152,7 @@ class Path
      * @param index index of the last path component to extract
      * @return path component or empty string
      */
-    String UptoItem(int index) const;
+    [[nodiscard]] String UptoItem(int index) const;
 
     /*!
      * @brief Return path from the index component up to the last component of the current path.
@@ -163,39 +160,39 @@ class Path
      * @param index index of the last path component to extract
      * @return path component or empty string
      */
-    String FromItem(int index) const;
+    [[nodiscard]] String FromItem(int index) const;
 
     /*!
      * @brief Return the directory part of the current path. /path/to/file => /path/to
      * @return Directory
      */
-    Path Directory() const;
+    [[nodiscard]] Path Directory() const;
 
     /*!
      * @brief Return the filename: the last component of the path. /path/to/file.ext => file.ext
      * @return filename
      */
 
-    String Filename() const;
+    [[nodiscard]] String Filename() const;
 
     /*!
      * @brief Return the filename less the extension if any. /path/to/file.ext => file
      * @return Filename without extension
      */
-    String FilenameWithoutExtension() const;
+    [[nodiscard]] String FilenameWithoutExtension() const;
 
     /*!
      * @brief Return the file extension if any. /path/to/file.ext => .ext
      * @return file extension inclusing the leading dot
      */
-    String Extension() const;
+    [[nodiscard]] String Extension() const;
 
     /*!
      * @brief Replace or add current extension by the given one
      * @param newext New extension
      * @return New path
      */
-    Path ChangeExtension(const String& newext) const;
+    [[nodiscard]] Path ChangeExtension(const String& newext) const;
 
     /*
      * Real filesystem
@@ -205,49 +202,49 @@ class Path
      * @brief Check if the path exist on the filesystem
      * @return True if the path exists
      */
-    bool Exists() const;
+    [[nodiscard]] bool Exists() const;
 
     /*!
      * @brief Check if the current path is a file
      * @return True if the path is a file
      */
-    bool IsFile() const;
+    [[nodiscard]] bool IsFile() const;
 
     /*!
      * @brief Check if the current path is a symbolic link
      * @return True if the path is a symbolic link
      */
-    bool IsSymLink() const;
+    [[nodiscard]] bool IsSymLink() const;
 
     /*!
      * @brief Check if the current path is a directory
      * @return True if the path is a directory
      */
-    bool IsDirectory() const;
+    [[nodiscard]] bool IsDirectory() const;
 
     /*!
      * @brief Check if the current path is hidden
      * @return True if the path is hidden
      */
-    bool IsHidden() const;
+    [[nodiscard]] bool IsHidden() const;
 
     /*!
      * @brief Try to create the whole path, from the very first ancestor up to the latest child
      * @return True if the final path exists
      */
-    bool CreatePath() const;
+    [[nodiscard]] bool CreatePath() const;
 
     /*!
      * @brief Delete the path
      * @return True if the path has been deletec
      */
-    bool Delete() const;
+    [[nodiscard]] bool Delete() const;
 
     /*!
      * @brief Get size of the file
      * @return Size in bytes
      */
-    long long Size() const;
+    [[nodiscard]] long long Size() const;
 
     /*
      * Operator overloading
@@ -394,26 +391,26 @@ class Path
      * @brief Check if the path is an absolute path
      * @return True if the path is absolute
      */
-    bool IsAbsolute() const { return ((!mPath.empty()) && (mPath[0] == '/')); }
+    [[nodiscard]] bool IsAbsolute() const { return ((!mPath.empty()) && (mPath[0] == '/')); }
 
     /*!
      * @brief Convert the current path to its absolute representation into a new path object
      * @return Absolute path
      */
-    Path ToAbsolute() const;
+    [[nodiscard]] Path ToAbsolute() const;
 
     /*!
      * @brief Convert the current path to its absolute representation into a new path object
      * if the current path is relative, use the given base as parent path
      * @return Absolute path
      */
-    Path ToAbsolute(const Path& base) const;
+    [[nodiscard]] Path ToAbsolute(const Path& base) const;
 
     /*!
      * @brief Convert the current path into its canonical form
      * @return
      */
-    Path ToCanonical() const;
+    [[nodiscard]] Path ToCanonical() const;
 
     /*!
      * @brief Try to remove the parent path from the current path
@@ -429,20 +426,20 @@ class Path
      * @param path path to check
      * @return True if the current path starts with the given path
      */
-    bool StartWidth(const Path& path) const;
+    [[nodiscard]] bool StartWidth(const Path& path) const;
 
     /*!
      * @brief Check if the current path starts with the given path
      * @param path path to check
      * @return True if the current path starts with the given path
      */
-    bool StartWidth(const String& path) const { return StartWidth(Path(path)); }
+    [[nodiscard]] bool StartWidth(const String& path) const { return StartWidth(Path(path)); }
 
     /*!
      * @brief Get an escaped string representation of the current path
      * @return bach compatible escaped path
      */
-    String MakeEscaped() const;
+    [[nodiscard]] String MakeEscaped() const;
 
     /*
      * Static helpers
@@ -472,9 +469,17 @@ class Path
 
     /*!
      * @brief Get file/directory list from the current directory path
+     * @param storeFolders True to store folders in the list. False to get files only
      * @return file and directory list, or empty list if the current path is invalid or not a directory
      */
-    PathList GetDirectoryContent() const;
+    [[nodiscard]] PathList GetDirectoryContent(bool storeFolders = true) const;
+
+    /*!
+     * @brief Get file/directory list recursively from the current directory path
+     * @param storeFolders True to store folders in the list. False to get files only
+     * @return file and directory list, or empty list if the current path is invalid or not a directory
+     */
+    [[nodiscard]] PathList RecurseDirectoryContent(bool storeFolders = true) const;
 
     /*!
      * @brief Check if the current folder contains at least a file

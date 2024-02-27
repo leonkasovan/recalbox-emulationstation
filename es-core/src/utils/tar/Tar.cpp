@@ -134,8 +134,7 @@ uint64_t Tar::ProcessFile(uint8_t *buffer, int buffersize) {
     fclose(currentfile);
     m_currenterror = TAR_NO_ERROR;
   } else {
-    { LOG(LogError) << "Can't write to " << m_outputpath + '/' + m_currentfile << ": "
-              << strerror(errno) << "\n"; }
+    { LOG(LogError) << "Can't write to " << m_outputpath + '/' + m_currentfile << ": " << strerror(errno); }
     m_currenterror = TAR_CANT_WRITE;
   }
   offsetincurrentobject += bytestowrite;

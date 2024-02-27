@@ -11,10 +11,7 @@ class GuiMenuArcadeAllInOneSystem : public GuiMenuBase
 {
   public:
     //! Constructor
-    explicit GuiMenuArcadeAllInOneSystem(WindowManager& window);
-
-    //! Destructor
-    ~GuiMenuArcadeAllInOneSystem() override;
+    explicit GuiMenuArcadeAllInOneSystem(WindowManager& window, SystemManager& systemManager);
 
   private:
     enum class Components
@@ -24,20 +21,12 @@ class GuiMenuArcadeAllInOneSystem : public GuiMenuBase
       HideOriginals,
     };
 
-    //! Original manufacturer list
-    String mOriginalManufacturerList;
-    //! Original Arcade ON/OFF value
-    bool mOriginalArcadeOnOff;
-    //! Original Include neogeo value
-    bool mOriginalIncludeNeogeo;
-    //! Original Hide Original value
-    bool mOriginalHideOriginals;
-
+    //! System manager reference
+    SystemManager& mSystemManager;
 
     /*
      * ISwitchComponent implementation
      */
 
-    void SwitchComponentChanged(int id, bool status) override;
-
+    void SwitchComponentChanged(int id, bool& status) override;
 };

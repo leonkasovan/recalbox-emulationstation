@@ -7,9 +7,11 @@
 #include <utils/network/HttpUnxzUntar.h>
 #include "utils/Log.h"
 
-HttpUnxzUntar::HttpUnxzUntar(Path outputPath)
+HttpUnxzUntar::HttpUnxzUntar(const Path& outputPath)
+  : mOutputPath(outputPath)
+  , mInbuf()
+  , mOutbuf()
 {
-  mOutputPath = &outputPath;
   if (xz.InitDecoder() != LZMA_OK) {
     // Decoder initialization failed. There's no point
     // to retry it so we need to exit.
@@ -18,14 +20,13 @@ HttpUnxzUntar::HttpUnxzUntar(Path outputPath)
   }
   { LOG(LogDebug) << "[HttpUnxzUntar] Xz initialized"; }
 
-  tar.Untar(mOutputPath->ToString());
+  tar.Untar(mOutputPath.ToString());
   { LOG(LogDebug) << "[HttpUnxzUntar] Tar initialized"; }
 
 }
 
 void HttpUnxzUntar::DataReceived(const char* data, int length)
 {
-  
   if (!ProcessBuffer(data, length, LZMA_RUN)) {
     if (tar.Error())
     { 
@@ -40,13 +41,11 @@ void HttpUnxzUntar::DataReceived(const char* data, int length)
       Cancel();
     }
   }
-  return;
-
 }
 
 size_t HttpUnxzUntar::ProcessBuffer(const char* ptr, size_t available, lzma_action action=LZMA_RUN) {
   size_t unarchived = 0; 
-  size_t availableout; 
+  size_t availableout = 0;
 
   xz.InjectBuffer((uint8_t*)ptr, available, action);
  
@@ -70,7 +69,7 @@ void HttpUnxzUntar::DataEnd()
 {
 }
 
-bool HttpUnxzUntar::SimpleExecute(const String& url, Http::IDownload* interface)
+bool HttpUnxzUntar::SimpleExecute(const String& url, HttpClient::IDownload* interface)
 {
   mIDownload = interface;
   if (mHandle != nullptr)

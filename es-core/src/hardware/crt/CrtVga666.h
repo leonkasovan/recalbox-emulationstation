@@ -12,7 +12,7 @@ class CrtVga666 : public ICrtInterface
 {
   public:
     //! Constructor
-    explicit CrtVga666(bool automaticallyDetected) : ICrtInterface(automaticallyDetected) {}
+    explicit CrtVga666(bool automaticallyDetected, BoardType boardType) : ICrtInterface(automaticallyDetected, boardType) {}
 
     //! Yes a CRT adapter is attached!
     bool IsCrtAdapterAttached() const override { return true; }
@@ -31,4 +31,8 @@ class CrtVga666 : public ICrtInterface
 
     //! This adapter cannot force 50hz
     bool MustForce50Hz() const override { return false; }
+
+    std::string& Name() const override { static std::string adapterString("VGA666"); return adapterString; }
+
+    std::string& ShortName() const override { static std::string adapterShortString("vga666"); return adapterShortString; }
 };

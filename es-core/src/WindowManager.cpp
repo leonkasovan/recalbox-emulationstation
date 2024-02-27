@@ -9,18 +9,17 @@
 #include "guis/GuiInfoPopup.h"
 
 WindowManager::WindowManager()
-  : mHelp(*this)
+  : mOSD(*this)
+  , mHelp(*this)
   , mBackgroundOverlay(*this)
   , mInfoPopups(sMaxInfoPopups)
   , mGuiStack(16) // Allocate memory once for all gui
-  , mBluetooth(*this)
-  , mFrameTimeElapsed(0)
-  , mFrameCountElapsed(0)
   , mAverageDeltaTime(10)
   , mTimeSinceLastInput(0)
   , mNormalizeNextUpdate(false)
   , mSleeping(false)
   , mRenderedHelpPrompts(false)
+  , mDisplayEnabled(true)
 {
   auto menuTheme = MenuThemeData::getInstance()->getCurrentTheme();
   mBackgroundOverlay.setImage(menuTheme->menuBackground.fadePath);
@@ -44,15 +43,56 @@ bool WindowManager::UpdateHelpSystem()
 
 void WindowManager::pushGui(Gui* gui)
 {
+  if (Gui* top = peekGui(); top != nullptr) top->onHide();
   mGuiStack.Push(gui);
+  gui->onShow();
   UpdateHelpSystem();
 }
 
 void WindowManager::RemoveGui(Gui* gui)
 {
+  Gui* previousTop = peekGui();
   for(int i = mGuiStack.Count(); --i >= 0;)
     if (mGuiStack[i] == gui)
+    {
+      gui->onHide();
       mGuiStack.PopAt(i);
+    }
+  if (Gui* top = peekGui(); top != nullptr && top != previousTop) top->onShow();
+}
+
+void WindowManager::deleteClosePendingGui()
+{
+  Gui* previousTop = peekGui();
+  bool deleted = false;
+  for(int i = mGuiStack.Count(); --i >= 0;)
+    if (mGuiStack[i]->IsPendingForDeletion())
+    {
+      Gui* gui = mGuiStack.PopAt(i);
+      gui->onHide();
+      delete gui;
+      deleted = true;
+    }
+  if (Gui* top = peekGui(); top != nullptr && top != previousTop) top->onShow();
+
+  // Refresh help system
+  if (deleted)
+    UpdateHelpSystem();
+}
+
+void WindowManager::deleteAllGui()
+{
+  for(int i = mInfoPopups.Count(); --i >= 0; )
+    delete mInfoPopups[i];
+  mInfoPopups.Clear();
+
+  for(int i = mGuiStack.Count(); --i >= 0;)
+  {
+    Gui* gui = mGuiStack.PopAt(i);
+    gui->onHide();
+    delete gui;
+  }
+  mGuiStack.Clear();
 }
 
 void WindowManager::displayMessage(const String& message, bool urgent)
@@ -76,32 +116,6 @@ Gui* WindowManager::peekGui()
     return nullptr;
 
   return mGuiStack.Peek();
-}
-
-void WindowManager::deleteClosePendingGui()
-{
-  bool deleted = false;
-  for(int i = mGuiStack.Count(); --i >= 0;)
-    if (mGuiStack[i]->IsPendingForDeletion())
-    {
-      delete mGuiStack.PopAt(i);
-      deleted = true;
-    }
-
-  // Refresh help system
-  if (deleted)
-    UpdateHelpSystem();
-}
-
-void WindowManager::deleteAllGui()
-{
-  for(int i = mInfoPopups.Count(); --i >= 0; )
-    delete mInfoPopups[i];
-  mInfoPopups.Clear();
-
-  for(int i = mGuiStack.Count(); --i >= 0;)
-    delete mGuiStack.PopAt(i);
-  mGuiStack.Clear();
 }
 
 bool WindowManager::ReInitialize()
@@ -134,7 +148,7 @@ bool WindowManager::Initialize(unsigned int width, unsigned int height, bool ini
   String glExts = (const char*) glGetString(GL_EXTENSIONS);
   { LOG(LogInfo) << "[WindowManager] Checking available OpenGL extensions..."; }
   { LOG(LogInfo) << "[WindowManager] ARB_texture_non_power_of_two: "
-                 << (glExts.find("ARB_texture_non_power_of_two") != String::npos ? "OK" : "MISSING"); }
+                 << (glExts.Contains("ARB_texture_non_power_of_two") ? "OK" : "MISSING"); }
 
   //InputManager::Instance().Initialize(this);
   ResourceManager::getInstance()->reloadAll();
@@ -176,6 +190,8 @@ bool WindowManager::ProcessInput(const InputCompactEvent& event)
     DoWake();
     return true;
   }
+
+  mOSD.ProcessInput(event);
 
   mTimeSinceLastInput = 0;
   if (peekGui() != nullptr)
@@ -221,31 +237,6 @@ void WindowManager::Update(int deltaTime)
       deltaTime = mAverageDeltaTime;
   }
 
-  mFrameTimeElapsed += deltaTime;
-  mFrameCountElapsed++;
-  if (mFrameTimeElapsed > 500)
-  {
-    mAverageDeltaTime = mFrameTimeElapsed / mFrameCountElapsed;
-
-    if (RecalboxConf::Instance().GetGlobalShowFPS())
-    {
-      String ss = String(1000.0f * (float) mFrameCountElapsed / (float) mFrameTimeElapsed, 1) +
-                  "fps, " + String((float) mFrameTimeElapsed / (float) mFrameCountElapsed, 2) + "ms";
-
-      // vram
-      float textureVramUsageMb = (float)TextureResource::getTotalMemUsage() / (1024.0f * 1024.0f);
-      float textureTotalUsageMb = (float)TextureResource::getTotalTextureSize() / (1024.0f * 1024.0f);
-      float fontVramUsageMb = (float)Font::getTotalMemUsage() / (1024.0f * 1024.0f);
-      ss += "\nFont VRAM: " + String(fontVramUsageMb, 2) + " Tex VRAM: " +
-            String(textureVramUsageMb, 2) + " Tex Max: " + String(textureTotalUsageMb, 2);
-
-      mFrameDataText = std::unique_ptr<TextCache>(mDefaultFonts[1]->buildTextCache(ss, 50.f, 50.f, 0xFF00FFFF));
-    }
-
-    mFrameTimeElapsed = 0;
-    mFrameCountElapsed = 0;
-  }
-
   mTimeSinceLastInput += deltaTime;
 
   // Process GUI pending for deletion
@@ -259,12 +250,20 @@ void WindowManager::Update(int deltaTime)
 
   // Process popups
   InfoPopupsUpdate(deltaTime);
-  // Process bluetooth
-  mBluetooth.Update(deltaTime);
+
+  // Process input OSD
+  mOSD.Update(deltaTime);
 }
 
 void WindowManager::Render(Transform4x4f& transform)
 {
+  if (!mDisplayEnabled)
+  {
+    Renderer::SetMatrix(Transform4x4f::Identity());
+    Renderer::DrawRectangle(0, 0, Renderer::Instance().DisplayWidthAsInt(), Renderer::Instance().DisplayHeightAsInt(), 0x000000FF);
+    return;
+  }
+
   mRenderedHelpPrompts = false;
 
   // draw only bottom and top of GuiStack (if they are different)
@@ -287,12 +286,6 @@ void WindowManager::Render(Transform4x4f& transform)
   if (!mRenderedHelpPrompts)
     mHelp.Render(transform);
 
-  if (RecalboxConf::Instance().GetGlobalShowFPS() && mFrameDataText)
-  {
-    Renderer::SetMatrix(Transform4x4f::Identity());
-    mDefaultFonts[1]->renderTextCache(mFrameDataText.get());
-  }
-
   unsigned int screensaverTime = (unsigned int) RecalboxConf::Instance().GetScreenSaverTime() * 60000;
   if (mTimeSinceLastInput >= screensaverTime && screensaverTime != 0)
   {
@@ -306,10 +299,12 @@ void WindowManager::Render(Transform4x4f& transform)
     }
   }
 
+  // Reset matrix
   Renderer::SetMatrix(Transform4x4f::Identity());
-  DisplayBatteryState();
-  mBluetooth.Render(Transform4x4f::Identity());
+  // Then popups
   InfoPopupsDisplay(transform);
+  // Pad OSD
+  mOSD.Render(Transform4x4f::Identity());
 }
 
 void WindowManager::renderHelpPromptsEarly()
@@ -392,39 +387,6 @@ bool WindowManager::KonamiCode(const InputCompactEvent& input)
   return false;
 }
 
-void WindowManager::DisplayBatteryState()
-{
-  if (!Board::Instance().HasBattery() ||
-      RecalboxConf::Instance().GetBatteryHidden()) return;
-
-  int charge = Board::Instance().BatteryChargePercent();
-  UnicodeChar unicodeIcon = 0xf1b4;
-  if (!Board::Instance().IsBatteryCharging())
-  {
-    if (charge >= 66)      unicodeIcon = 0xF1ba;
-    else if (charge >= 33) unicodeIcon = 0xF1b8;
-    else if (charge >= 15) unicodeIcon = 0xF1b1;
-    else                   unicodeIcon = 0xF1b5;
-  }
-
-  //int charge = 9; UnicodeChar unicodeIcon = 0xF1b1;
-  unsigned int color = 0xFFFFFFFF;
-  if (charge < 15) color = 0xFF8000FF;
-  if ((charge < 10) && ((SDL_GetTicks() >> 8) & 3) == 0) color = 0xFF0000FF;
-
-  Font* font = Font::get(Renderer::Instance().Is240p() ? (int)FONT_SIZE_LARGE : (int)FONT_SIZE_MEDIUM).get();
-  Font::Glyph& glyph = font->Character(unicodeIcon);
-  float glyphWidth = glyph.texSize.x() * (float) glyph.texture->textureSize.x();
-  float glyphHeight = glyph.texSize.y() * (float) glyph.texture->textureSize.y();
-  float x = Renderer::Instance().DisplayWidthAsFloat() - Math::round(glyphWidth * 1.25f);
-  float y = Math::round(glyphHeight * 0.25f);
-  font->renderCharacter(unicodeIcon, x + 1, y, 1.f, 1.f, 0xFF);
-  font->renderCharacter(unicodeIcon, x - 1, y, 1.f, 1.f, 0xFF);
-  font->renderCharacter(unicodeIcon, x, y + 1, 1.f, 1.f, 0xFF);
-  font->renderCharacter(unicodeIcon, x, y - 1, 1.f, 1.f, 0xFF);
-  font->renderCharacter(unicodeIcon, x, y, 1.f, 1.f, color);
-}
-
 void WindowManager::RenderAll(bool halfLuminosity)
 {
   Transform4x4f transform(Transform4x4f::Identity());
@@ -434,7 +396,9 @@ void WindowManager::RenderAll(bool halfLuminosity)
     Renderer::SetMatrix(Transform4x4f::Identity());
     Renderer::DrawRectangle(0.f, 0.f, Renderer::Instance().DisplayWidthAsFloat(), Renderer::Instance().DisplayHeightAsFloat(), 0x00000080);
   }
+  mOSD.GetFpsOSD().RecordStopFrame();
   Renderer::Instance().SwapBuffers();
+  mOSD.GetFpsOSD().RecordStartFrame();
 }
 
 void WindowManager::CloseAll()
@@ -554,5 +518,4 @@ void WindowManager::InfoPopupsDisplay(Transform4x4f& transform)
     for(int i = mInfoPopups.Count(); --i >= 0;)
       mInfoPopups[i]->Render(transform);
 }
-
 

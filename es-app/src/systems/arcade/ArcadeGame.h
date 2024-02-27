@@ -9,6 +9,90 @@
 class ArcadeGame
 {
   public:
+    //! 4 manufacturer storage
+    template<typename rawType> struct ManufacturerHolder
+    {
+      public:
+        //! Constructor
+        ManufacturerHolder() : mManufacturers(0) {}
+
+        /*!
+         * @brief Add new manufacturer to the list
+         * @param manufacturer
+         */
+        void Add(int manufacturer)
+        {
+          if (manufacturer > sMask) { LOG(LogError) << "[ArcadeGame] Storage erreor! Manufacturer index greater than storage space!"; return; }
+          int pos = Count();
+          if (pos == 4) { LOG(LogError) << "[ArcadeGame] Storage error! No space left in 4 manufacturer storage!"; return; }
+          mManufacturers &= ~((rawType)sMask << (sBits * pos + sCountBits));
+          mManufacturers |= ((rawType)manufacturer << (sBits * pos + sCountBits));
+          mManufacturers++; // Increment counter only
+        }
+
+        void SetAt(int manufacturer, int at)
+        {
+          at &= 3;
+          mManufacturers &= ~((rawType)sMask << (sBits * at + sCountBits));
+          mManufacturers |= ((rawType)manufacturer << (sBits * at + sCountBits));
+        }
+
+        /*!
+         * @brief Manufacturer count (0-4)
+         * @return Number of stored manufacturers
+         */
+        [[nodiscard]] int Count() const
+        {
+          return (int)mManufacturers & sCountMask;
+        }
+
+        /*!
+         * @brief Check if this holder contains only one zero'ed entry
+         * @return True if this holder contain sonly one zero'ed entry, false otherwise
+         */
+        [[nodiscard]] bool HasOnlyZero() const
+        {
+          return mManufacturers == 1; // Counter == 1 && all data == 0
+        }
+
+        /*!
+         * @brief Check if the holder contains the given manufacturer index
+         * @param manufacturer Manufacturer index
+         * @return True if the holder contains the given manufacturer index, false otherwise
+         */
+        [[nodiscard]] bool Contains(int manufacturer) const
+        {
+          rawType tmp = mManufacturers >> sCountBits;
+          for(int i = Count(); --i >= 0; tmp >>= sBits)
+            if ((int)(tmp & sMask) == manufacturer)
+              return true;
+          return false;
+        }
+
+        /*!
+         * @brief Get manufacturer at the given index
+         * @param index Index (0-3)
+         * @return Manufacturer
+         */
+        [[nodiscard]] int Manufacturer(int index) const
+        {
+          index &= 3;
+          return (int)((mManufacturers >> (sBits * index + sCountBits)) & sMask);
+        }
+
+      private:
+        static constexpr int sCountBits = 2;                                      //! Keep 2 bits to store item count
+        static constexpr int sCountMask = (1 << sCountBits) - 1;                  //! Counter mask
+        static constexpr int sBits = ((int)sizeof(rawType) * 8 - sCountBits) / 4; //! Number of storage bits for a single subdata
+        static constexpr int sMask = (1 << sBits) - 1;                            //! Single subdata mask
+        rawType mManufacturers;                                                   //!< Raw data holder
+    } __attribute__((packed));
+
+    //! Convenient raw manufacturer typedef
+    typedef ManufacturerHolder<long long int> RawManufacturerHolder;
+    //! Convenient raw manufacturer typedef
+    typedef ManufacturerHolder<int> LimitedManufacturerHolder;
+
     //! Game type
     enum class Type : char
     {
@@ -35,23 +119,31 @@ class ArcadeGame
     };
 
     //! Constructor
-    ArcadeGame(const FileData* game, const FileData* parent, const String& arcadeName, int rawdriver, Type type, Status status, Rotation rotation)
+    ArcadeGame(const FileData* game, const FileData* parent, const String& arcadeName, const ManufacturerHolder<long long int>& rawManufacturers, Type type, Status status, Rotation rotation, unsigned short width, unsigned short height)
       : mGame(game)
       , mParent(parent)
+      , mRawManufacturer(rawManufacturers)
       , mNameIndex(sNameHolder.AddString32(arcadeName))
-      , mRawDriver(rawdriver)
-      , mLimitedDriver(0)
       , mType(type)
       , mStatus(status)
       , mRotation(rotation)
+      , mWidth(width)
+      , mHeight(height)
     {
     }
 
     /*!
-     * @brief Remap driver
-     * @param destinationDriver new driver
+     * @brief Remap manufacturer
+     * @param destinationManufacturer new manufacturer
+     * @param at storage index
      */
-    void SetLimitedDriver(int destinationDriver) { mLimitedDriver = (unsigned char)destinationDriver; }
+    void AddLimitedManufacturer(int destinationManufacturer) { mLimitedManufacturer.Add(destinationManufacturer); }
+
+    /*!
+     * @brief Decrease manufacturer index at the given position
+     * @param index storage index
+     */
+    void DecLimitedManufacturerAt(int index) { mLimitedManufacturer.SetAt(mLimitedManufacturer.Manufacturer(index) - 1, index); }
 
     /*
      * Getters
@@ -60,11 +152,13 @@ class ArcadeGame
     [[nodiscard]] const FileData& Game() const { return *mGame; }
     [[nodiscard]] const FileData* Parent() const { return mParent; }
     [[nodiscard]] String ArcadeName() const { return sNameHolder.GetString(mNameIndex); }
-    [[nodiscard]] int RawDriver() const { return (int)mRawDriver; }
-    [[nodiscard]] int LimitedDriver() const { return (int)mLimitedDriver; }
+    [[nodiscard]] const RawManufacturerHolder& RawManufacturer() const { return mRawManufacturer; }
+    [[nodiscard]] const LimitedManufacturerHolder& LimitedManufacturer() const { return mLimitedManufacturer; }
     [[nodiscard]] Type Hierarchy() const { return mType; }
     [[nodiscard]] Status EmulationStatus() const { return mStatus; }
     [[nodiscard]] Rotation ScreenRotation() const { return mRotation; }
+    [[nodiscard]] unsigned short Width() const { return mWidth; }
+    [[nodiscard]] unsigned short Height() const { return mHeight; }
 
     /*
      * Tools
@@ -130,15 +224,17 @@ class ArcadeGame
     static void Finalize() { sNameHolder.Finalize(); }
 
   private:
-    const FileData* mGame;          //!< Game reference - cannot be null
-    const FileData* mParent;        //!< Parent reference or null
-    int             mNameIndex;     //!< Name index in name holder
-    unsigned short  mRawDriver;     //!< Raw Driver index
-    unsigned short  mLimitedDriver; //!< Raw Driver index
-    Type            mType;          //!< Game type
-    Status          mStatus;        //!< Emulation status
-    Rotation        mRotation;      //!< Rotation
+    const FileData*           mGame;          //!< Game reference - cannot be null
+    const FileData*           mParent;        //!< Parent reference or null
+    RawManufacturerHolder     mRawManufacturer;     //!< Raw Manufacturer index
+    LimitedManufacturerHolder mLimitedManufacturer; //!< Limited Manufacturer index
+    int                       mNameIndex;     //!< Name index in name holder
+    Type                      mType;          //!< Game type
+    Status                    mStatus;        //!< Emulation status
+    Rotation                  mRotation;      //!< Rotation
+    unsigned short            mWidth;
+    unsigned short            mHeight;
 
     //! Arcade name string holder
     static MetadataStringHolder sNameHolder;
-};
+} __attribute__((packed));

@@ -5,6 +5,7 @@
 
 #include <utils/os/system/Thread.h>
 #include <hardware/messaging/HardwareMessageSender.h>
+#include <linux/input-event-codes.h>
 
 class RG353XJackEventReader : private Thread
 {
@@ -25,9 +26,9 @@ class RG353XJackEventReader : private Thread
     //! Event to read
     static constexpr const char* sInputEventPath = "/dev/input/event4";
     //! Headphone insert event type
-    static constexpr int sHeadphoneInsertType = 1;
+    static constexpr int sHeadphoneInsertType = EV_SW;
     //! Headphone insert event code
-    static constexpr int sHeadphoneInsertCode = 226;
+    static constexpr int sHeadphoneInsertCode = SW_HEADPHONE_INSERT;
     //! Message sender
     HardwareMessageSender& mSender;
     //! File handle

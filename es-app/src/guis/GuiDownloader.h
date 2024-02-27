@@ -4,7 +4,7 @@
 #pragma once
 
 #include "guis/Gui.h"
-#include "utils/network/Http.h"
+#include "utils/network/HttpClient.h"
 #include "components/TextComponent.h"
 #include "components/ProgressBarComponent.h"
 #include "components/ComponentGrid.h"
@@ -20,7 +20,7 @@ class GuiDownloader : public Gui
      * @param window Window manager
      * @param system Target wasm4 system
      */
-    GuiDownloader(WindowManager& window, SystemData& system);
+    GuiDownloader(WindowManager& window, SystemData& system, SystemManager& systemManager);
 
     /*!
      * @brief Destructor
@@ -91,4 +91,7 @@ class GuiDownloader : public Gui
     std::shared_ptr<TextComponent> mText;
     std::shared_ptr<ProgressBarComponent> mBar;
     std::shared_ptr<TextComponent> mEta;
+
+    // SystemManager reference
+    SystemManager& mSystemManager;
 };

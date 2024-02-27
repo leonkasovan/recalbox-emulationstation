@@ -80,18 +80,18 @@ void ScraperFactory::ExtractFileNameUndecorated(FileData& game)
   String name = game.RomPath().FilenameWithoutExtension();
 
   // Remove (text)
-  for(unsigned long pos = 0; (pos = name.find('(', pos)) != String::npos; )
+  for(int pos = 0; (pos = name.Find('(', pos)) >= 0; )
   {
-    unsigned long end = name.find(')', pos);
-    if (end == String::npos) end = name.size() - 1;
+    int end = name.Find(')', pos);
+    if (end < 0) end = (int)name.size() - 1;
     name.erase(pos, end - pos + 1);
   }
 
   // Remove [text]
-  for(unsigned long pos = 0; (pos = name.find('(', pos)) != String::npos; )
+  for(int pos = 0; (pos = name.Find('[', pos)) >= 0; )
   {
-    unsigned long end = name.find(')', pos);
-    if (end == String::npos) end = name.size() - 1;
+    int end = name.Find(']', pos);
+    if (end < 0) end = (int)name.size() - 1;
     name.erase(pos, end - pos + 1);
   }
 

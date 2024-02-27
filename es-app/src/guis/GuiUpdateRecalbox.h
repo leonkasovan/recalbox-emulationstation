@@ -19,7 +19,7 @@
 class GuiUpdateRecalbox: public Gui
                        , private Thread
                        , private ISyncMessageReceiver<int>
-                       , private Http::IDownload
+                       , private HttpClient::IDownload
 {
   public:
     GuiUpdateRecalbox(WindowManager& window, const String& tarUrl, const String& imageUrl, const String& sha1Url, const String& newVersion);
@@ -57,11 +57,11 @@ class GuiUpdateRecalbox: public Gui
      * @param currentSize downloaded bytes
      * @param expectedSize total expected bytes
      */
-    void DownloadProgress(const Http& http, long long currentSize, long long expectedSize);
+    void DownloadProgress(const HttpClient& http, long long currentSize, long long expectedSize);
 
     //! Http request objects
     HttpUnxzUntar mTarRequest;
-    Http mImgRequest;
+    HttpClient mImgRequest;
 
     //! Tar Url to download and decompress
     String mTarUrl;

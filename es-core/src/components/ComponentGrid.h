@@ -26,6 +26,19 @@ DEFINE_BITFLAG_ENUM(Borders, unsigned int)
 class ComponentGrid : public Component
 {
   public:
+    enum class HAlignment : char
+    {
+      Left,
+      Center,
+      Right
+    };
+    enum class VAlignment : char
+    {
+      Top,
+      Center,
+      Bottom
+    };
+
     ComponentGrid(WindowManager& window, const Vector2i& gridDimensions);
 
     void SetGridDimensions(const Vector2i& gridDimensions);
@@ -33,13 +46,16 @@ class ComponentGrid : public Component
     int EntryCount() const
     { return (int) mCells.size(); }
 
-    void ClearEntries()
-    { mCells.clear(); }
+    void ClearEntries() { mCells.clear(); mCursor.Set(0, 0); }
 
     bool removeEntry(const std::shared_ptr<Component>& comp);
 
     void setEntry(const std::shared_ptr<Component>& comp, const Vector2i& pos, bool canFocus, bool resize = true,
                   const Vector2i& size = Vector2i(1, 1), Borders border = Borders::None,
+                  UpdateType updateType = UpdateType::Always);
+
+    void setEntry(const std::shared_ptr<Component>& comp, const Vector2i& pos, bool canFocus, HAlignment ha, VAlignment va,
+                  bool resize = true, const Vector2i& size = Vector2i(1, 1), Borders border = Borders::None,
                   UpdateType updateType = UpdateType::Always);
 
     void textInput(const char* text) override;
@@ -118,14 +134,93 @@ class ComponentGrid : public Component
         std::shared_ptr<Component> component;
         UpdateType updateType;
         Borders border;
+        HAlignment hzAlign;
+        VAlignment vtAlign;
         bool canFocus;
         bool resize;
 
-        explicit GridEntry(const Vector2i& p = Vector2i::Zero(), const Vector2i& d = Vector2i::Zero(),
-                           std::shared_ptr<Component> cmp = nullptr, bool f = false, bool r = true,
-                           UpdateType u = UpdateType::Always, Borders b = Borders::None)
-          : pos(p), dim(d), component(std::move(cmp)), updateType(u), border(b), canFocus(f), resize(r)
-        {};
+        explicit GridEntry(const Vector2i& p, const Vector2i& d, std::shared_ptr<Component> cmp)
+          : pos(p)
+          , dim(d)
+          , component(std::move(cmp))
+          , updateType(UpdateType::Always)
+          , border(Borders::None)
+          , hzAlign(HAlignment::Center)
+          , vtAlign(VAlignment::Center)
+          , canFocus(false)
+          , resize(true)
+        {
+        }
+
+        explicit GridEntry(const Vector2i& p, const Vector2i& d, std::shared_ptr<Component> cmp,
+                           HAlignment ha, VAlignment va)
+          : pos(p)
+          , dim(d)
+          , component(std::move(cmp))
+          , updateType(UpdateType::Always)
+          , border(Borders::None)
+          , hzAlign(ha)
+          , vtAlign(va)
+          , canFocus(false)
+          , resize(true)
+        {
+        }
+
+        explicit GridEntry(const Vector2i& p, const Vector2i& d, std::shared_ptr<Component> cmp,
+                           bool f, bool r)
+          : pos(p)
+          , dim(d)
+          , component(std::move(cmp))
+          , updateType(UpdateType::Always)
+          , border(Borders::None)
+          , hzAlign(HAlignment::Center)
+          , vtAlign(VAlignment::Center)
+          , canFocus(f)
+          , resize(r)
+        {
+        }
+
+        explicit GridEntry(const Vector2i& p, const Vector2i& d, std::shared_ptr<Component> cmp,
+                           HAlignment ha, VAlignment va, bool f, bool r)
+          : pos(p)
+          , dim(d)
+          , component(std::move(cmp))
+          , updateType(UpdateType::Always)
+          , border(Borders::None)
+          , hzAlign(ha)
+          , vtAlign(va)
+          , canFocus(f)
+          , resize(r)
+        {
+        }
+
+        explicit GridEntry(const Vector2i& p, const Vector2i& d, std::shared_ptr<Component> cmp,
+                           bool f, bool r, UpdateType u, Borders b)
+          : pos(p)
+          , dim(d)
+          , component(std::move(cmp))
+          , updateType(u)
+          , border(b)
+          , hzAlign(HAlignment::Center)
+          , vtAlign(VAlignment::Center)
+          , canFocus(f)
+          , resize(r)
+        {
+        }
+
+        explicit GridEntry(const Vector2i& p, const Vector2i& d, std::shared_ptr<Component> cmp,
+                           HAlignment ha, VAlignment va, bool f, bool r, UpdateType u, Borders b)
+          : pos(p)
+          , dim(d)
+          , component(std::move(cmp))
+          , updateType(u)
+          , border(b)
+          , hzAlign(ha)
+          , vtAlign(va)
+          , canFocus(f)
+          , resize(r)
+        {
+        }
 
         explicit operator bool() const
         {

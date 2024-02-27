@@ -39,7 +39,6 @@ bool PiBoard::HasBattery()
     case Case::CaseModel::PiBoyXRS:
     case Case::CaseModel::PiBoyDMG:
       return true;
-      break;
     case Case::CaseModel::GPiV1:
     case Case::CaseModel::GPiV2:
     case Case::CaseModel::GPiV3:

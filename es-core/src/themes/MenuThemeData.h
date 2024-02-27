@@ -37,6 +37,7 @@ struct MenuIconElement {
   Path games;
   Path controllers;
   Path ui;
+  Path download;
   Path arcade;
   Path tate;
   Path sound;

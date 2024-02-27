@@ -27,7 +27,6 @@ void ScrollableContainer::Render(const Transform4x4f& parentTrans)
 	Transform4x4f trans = parentTrans * getTransform();
 
 	Vector2i clipPos((int)trans.translation().x(), (int)trans.translation().y());
-
 	Vector3f dimScaled = trans * Vector3f(mSize.x(), mSize.y(), 0);
 	Vector2i clipDim((int)(dimScaled.x() - trans.translation().x()), (int)(dimScaled.y() - trans.translation().y()));
 

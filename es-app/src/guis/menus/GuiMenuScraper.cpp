@@ -20,10 +20,8 @@ GuiMenuScraper::GuiMenuScraper(WindowManager& window, SystemManager& systemManag
 {
   mScrapers = AddList<ScraperType>(_("SCRAPE FROM"), (int)Components::Scraper, this, GetScrapersEntries(), _(MENUMESSAGE_SCRAPER_FROM_HELP_MSG));
 
-  // if (PatronInfo::Instance().IsPatron())
+  if (PatronInfo::Instance().IsPatron())
     AddSwitch(_("AUTOMATIC SCRAPING"), RecalboxConf::Instance().GetScraperAuto(), (int)Components::ScraperAuto, this);
-
-  AddSwitch(_("LOCAL SCRAPING"), RecalboxConf::Instance().GetScraperLocal(), (int)Components::ScraperLocal, this);
 
   AddSubMenu(_("SCRAPER OPTIONS"), (int)Components::ScraperOptions);
 
@@ -71,7 +69,7 @@ std::vector<GuiMenuBase::ListEntry<SystemData*>> GuiMenuScraper::GetSystemsEntri
   std::vector<ListEntry<SystemData*>> list;
   for(SystemData* system : mSystemManager.VisibleSystemList())
   {
-    if (!system->IsVirtual() || system->IsFavorite() || system->IsPorts()) // Allow scraping favorites, but not virtual systems
+    if (!system->IsScreenshots() && !system->IsLastPlayed()) // Only screenshot doesn't need to be scraped
       if (system->HasScrapableGame())
         list.push_back({ system->FullName(), system, false });
   }
@@ -116,43 +114,8 @@ void GuiMenuScraper::start()
     GuiScraperRun::CreateOrShow(mWindow, mSystemManager, mSystems->getSelectedObjectsAsArray(), mScrapingMethod->getSelected(), &GameRunner::Instance(), Renderer::Instance().DisplayHeightAsInt() <=576);
 }
 
-const char *local_scrape_script = 
-"directory=\"/recalbox/share/screenshots\"\n\
-rom_fullpath=$6\n\
-rom_extension=\"${rom_fullpath##*.}\"\n\
-rom_filename=$(basename \"$rom_fullpath\")\n\
-rom_title=$(basename \"$rom_fullpath\" \".$rom_extension\")\n\
-rom_directory=$(dirname \"$rom_fullpath\")\n\
-\n\
-for file in \"$directory\"/*; do\n\
-	if [[ -f \"$file\" ]]; then # Check if it's a regular file\n\
-		if [[ $file == *\"$rom_title\"* ]]; then # Compare the filename with the specific string\n\
-			source=\"$file\"\n\
-			target=\"$rom_directory/media/images/$rom_title.png\"\n\
-		fi\n\
-	fi\n\
-done\n\
-mkdir -p \"$rom_directory/media/images\"\n\
-cp \"$source\" \"$target\"\n";
-
-void GuiMenuScraper::SwitchComponentChanged(int id, bool status)
+void GuiMenuScraper::SwitchComponentChanged(int id, bool& status)
 {
   if ((Components)id == Components::ScraperAuto)
     RecalboxConf::Instance().SetScraperAuto(status).Save();
-  else if ((Components)id == Components::ScraperLocal){
-    RecalboxConf::Instance().SetScraperLocal(status).Save();
-    if (status){  // ScraperLocal is true then create a script for event "EndGame"
-      FILE *f;
-
-      f = fopen("/recalbox/share/userscripts/scrape-screenshot[EndGame].sh","w");
-      if (f){
-        fputs(local_scrape_script, f);
-        fclose(f);
-      }
-    }else{ // ScraperLocal is false then delete the script for event "EndGame"
-      Path script("/recalbox/share/userscripts/scrape-screenshot[EndGame].sh");
-      script.Delete();
-    }
-  }
-    
 }

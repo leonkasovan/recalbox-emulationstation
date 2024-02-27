@@ -75,6 +75,7 @@ void ScraperSeamless::ScrapingStageCompleted(FileData* game, Stage stage, Metada
 
 void ScraperSeamless::Push(FileData* game, IScraperEngineStage* interface)
 {
+  // if (PatronInfo::Instance().IsPatron() && !game->TopAncestor().ReadOnly() && RecalboxConf::Instance().GetScraperAuto())
   if (!game->TopAncestor().ReadOnly() && RecalboxConf::Instance().GetScraperAuto())
   {
     // Need to run scrape again?

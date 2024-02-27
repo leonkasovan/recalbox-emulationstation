@@ -82,7 +82,7 @@ class ThemeData
 
     static HashMap<String, ThemeSet> getThemeSets();
 	static HashMap<String, String> getThemeSubSets(const String& theme);
-	static HashMap<String, String> sortThemeSubSets(const HashMap<String, String>& subsetmap, const String& subset);
+	static String::List sortThemeSubSets(const HashMap<String, String>& subsetmap, const String& subset);
 	static Path getThemeFromCurrentSet(const String& system);
 	String getTransition() const;
 

@@ -112,7 +112,7 @@ bool RemotePlaylist::UpdatePlayList()
 void RemotePlaylist::InitializeIndex()
 {
   // Initialize main path
-  mStorageRoot.CreatePath();
+  (void)mStorageRoot.CreatePath();
 
   // Try loading index
   Path indexPath(sStorageIndex);
@@ -144,7 +144,7 @@ void RemotePlaylist::SanitizeFiles()
   for(const Path& file : Path(sStorageRootPath).GetDirectoryContent())
     if (LookupTrackIndex(file.FilenameWithoutExtension()) < 0)
     {
-      file.Delete();
+      (void)file.Delete();
       { LOG(LogError) << "[RemotePlaylist] File " << file.ToString() << " not in playlist. Deleted."; }
     }
 
@@ -163,7 +163,7 @@ void RemotePlaylist::SanitizeFiles()
         if (((first < last) && (i < first || i >= last)) || ((first > last) && (i > last && i < first)) ||
             !mPlaylist[i].HasValidFile())
         {
-          file.Delete();
+          (void)file.Delete();
           { LOG(LogError) << "[RemotePlaylist] File " << file.ToString() << " out of index range. Deleted."; }
         }
     }

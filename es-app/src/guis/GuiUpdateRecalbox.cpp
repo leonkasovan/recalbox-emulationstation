@@ -208,11 +208,11 @@ void GuiUpdateRecalbox::Run()
       return;
     }
 
-  destination.Delete();
+  (void)destination.Delete();
   mSender.Send(-1);
 }
 
-void GuiUpdateRecalbox::DownloadProgress(const Http&, long long int currentSize, long long int expectedSize)
+void GuiUpdateRecalbox::DownloadProgress(const HttpClient&, long long int currentSize, long long int expectedSize)
 {
   // Store data and synchronize
   mTotalSize = expectedSize;

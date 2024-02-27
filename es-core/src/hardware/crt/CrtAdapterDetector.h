@@ -22,7 +22,7 @@ class CrtAdapterDetector
      * @brief Detect & create CRT board
      * @return CRT board implementation or nullptr
      */
-    static ICrtInterface* CreateCrtBoard();
+    static ICrtInterface* CreateCrtBoard(BoardType boardType);
 
   private:
     /*!
