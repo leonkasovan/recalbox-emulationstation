@@ -921,31 +921,44 @@ bool SystemManager::LoadSystems(const DescriptorList& systemList, FileNotifier* 
   { LOG(LogInfo) << "[System] Gamelist load time: " << std::to_string((stop-start).TotalMilliseconds()) << "ms"; }
 
   // Cleanup metadata
+  start = DateTime();
   MetadataDescriptor::CleanupHolders();
+  { LOG(LogInfo) << "[System] MetadataDescriptor::CleanupHolders: " << std::to_string((DateTime()-start).TotalMilliseconds()) << "ms"; }
 
   // Phase #2
+  start = DateTime();
   NotifyLoadingPhase(ISystemLoadingPhase::Phase::VirtualSystems);
+  { LOG(LogInfo) << "[System] NotifyLoadingPhase: " << std::to_string((DateTime()-start).TotalMilliseconds()) << "ms"; }
 
   if (!novirtuals)
   {
+    start = DateTime();
     // Load virtual systems
     LoadVirtualSystems(systemList, portableSystem);
 
     // Remove required systems
     ManagePortsVirtualSystem();
     ManageArcadeVirtualSystem(true);
+    { LOG(LogInfo) << "[System] LoadVirtualSystems: " << std::to_string((DateTime()-start).TotalMilliseconds()) << "ms"; }
   }
 
   // Sort systems based on conf option
+  start = DateTime();
   mOriginalOrderedSystems = mAllSystems;
   SystemSorting();
+  { LOG(LogInfo) << "[System] SystemSorting: " << std::to_string((DateTime()-start).TotalMilliseconds()) << "ms"; }
 
   // Add gamelist watching
-  if (gamelistWatcher != nullptr)
+  if (gamelistWatcher != nullptr){
+    start = DateTime();
     WatchGameList(*gamelistWatcher);
+    { LOG(LogInfo) << "[System] WatchGameList: " << std::to_string((DateTime()-start).TotalMilliseconds()) << "ms"; }
+  }
 
   // Finalize arcade loading
+  start = DateTime();
   ArcadeDatabaseManager::Finalize();
+  { LOG(LogInfo) << "[System] ArcadeDatabaseManager::Finalize: " << std::to_string((DateTime()-start).TotalMilliseconds()) << "ms"; }
 
   // Phase #3
   NotifyLoadingPhase(ISystemLoadingPhase::Phase::Completed);
