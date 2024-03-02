@@ -374,13 +374,13 @@ void GuiSearch::populateGridMeta(int i)
 
     // clear();
     mMDPublisherLabel->setText("System : ");
-    mMDDeveloperLabel->setText("Title : ");
+    mMDDeveloperLabel->setText("");
     mMDPublisher->setText(mSR2[ii].system);
-    { LOG(LogDebug) << "[GuiSearch] mSR2[ii].system:" << mSR2[ii].system; }
-    mMDDeveloper->setText(mSR2[ii].title);
-    { LOG(LogDebug) << "[GuiSearch] mSR2[ii].title:" << mSR2[ii].title; }
-    mResultDesc->setText(mSR2[ii].desc);
-    { LOG(LogDebug) << "[GuiSearch] mSR2[ii].desc:" << mSR2[ii].desc; }
+    // { LOG(LogDebug) << "[GuiSearch] mSR2[ii].system:" << mSR2[ii].system; }
+    mMDDeveloper->setText("");
+    // { LOG(LogDebug) << "[GuiSearch] mSR2[ii].title:" << mSR2[ii].title; }
+    mResultDesc->setText(" " + mSR2[ii].title + "\n " + String(mSR2[ii].desc).Replace('-','\n'));
+    // { LOG(LogDebug) << "[GuiSearch] mSR2[ii].desc:" << mSR2[ii].desc; }
     mDescContainer->setSize(mGridMeta->getColWidth(2) + mGridMeta->getColWidth(3), mGridMeta->getRowHeight(2)*0.9f);
     mResultDesc->setSize(mDescContainer->getSize().x(), 0); // make desc text wrap at edge of container
 
