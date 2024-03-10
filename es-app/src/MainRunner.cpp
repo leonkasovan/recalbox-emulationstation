@@ -146,6 +146,42 @@ MainRunner::ExitState MainRunner::Run()
     // Scrapers
     ScraperFactory scraperFactory;
 
+    // Additional Info by Novan
+    {
+      String buf;
+
+      SDL_version compiled;
+      SDL_VERSION(&compiled);
+      LOG(LogInfo) << (_F("We compiled against SDL version {0}.{1}.{2}") / (int)compiled.major / (int)compiled.minor / (int)compiled.patch).ToString();
+
+      SDL_version linked;
+      SDL_GetVersion(&linked);
+      LOG(LogInfo) << (_F("But we are linking against SDL version {0}.{1}.{2}") / (int)linked.major / (int)linked.minor/ (int)linked.patch).ToString();
+
+      int numVideoDrivers = SDL_GetNumVideoDrivers();
+      buf = "";
+      for (int i = 0; i < numVideoDrivers; i++) {
+        buf += SDL_GetVideoDriver(i);
+        buf += ", ";
+      }
+      LOG(LogInfo) << "Available video drivers: "<< buf;
+
+      int numAudioDrivers = SDL_GetNumAudioDrivers();
+      buf = "";
+      for (int i = 0; i < numAudioDrivers; i++) {
+        buf += SDL_GetAudioDriver(i);
+        buf += ", ";
+      }
+      LOG(LogInfo) << "Available audio drivers: " << buf;
+
+      LOG(LogInfo) << (_F("Currently using video driver: {0}") / SDL_GetCurrentVideoDriver()).ToString();
+      LOG(LogInfo) << (_F("Currently using audio driver: {0}") / SDL_GetCurrentAudioDriver()).ToString();
+
+      LOG(LogInfo) << "GL_VENDOR: " << (glGetString(GL_VENDOR) ? (const char*)glGetString(GL_VENDOR) : "");
+      LOG(LogInfo) << "GL_RENDERER: " << (glGetString(GL_RENDERER) ? (const char*)glGetString(GL_RENDERER) : "");
+      LOG(LogInfo) << "GL_VERSION: " << (glGetString(GL_VERSION) ? (const char*)glGetString(GL_VERSION) : "");
+    }
+
     ExitState exitState = ExitState::Quit;
     try
     {

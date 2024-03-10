@@ -59,7 +59,7 @@ void GuiMenuBase::Update(int deltaTime)
   {
     // footer
 
-    mMenu.setFooter(!mFooter.empty() ? mFooter : "RECALBOX VERSION " + String(PROGRAM_VERSION_STRING).UpperCase() + (PatronInfo::Instance().IsPatron() ? " - PATRON FLAVOR": ""));
+    mMenu.setFooter(!mFooter.empty() ? mFooter : "RECALBOX VERSION " + String(PROGRAM_VERSION_STRING).UpperCase() + "  " + String(PROGRAM_BUILT_STRING).UpperCase());
     // Position
     mMenu.setPosition((Renderer::Instance().DisplayWidthAsFloat() - mMenu.getSize().x()) / 2, (Renderer::Instance().DisplayHeightAsFloat() - mMenu.getSize().y()) / 2);
 
