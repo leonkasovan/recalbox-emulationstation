@@ -180,7 +180,7 @@ class RecalboxConf: public IniFile, public StaticLifeCycleControler<RecalboxConf
 
     DefineGetterSetter(SwapValidateAndCancel, bool, Bool, sSwapValidateAndCancel, true)
 
-    DefineGetterSetter(AudioVolume, int, Int, sAudioVolume, 90)
+    DefineGetterSetter(AudioVolume, int, Int, sAudioVolume, 60)
     DefineGetterSetter(AudioOuput, String, String, sAudioOuput, "")
 
     DefineGetterSetter(MusicRemoteEnable, bool, Bool, sMusicDisableRemote, false)
@@ -206,7 +206,7 @@ class RecalboxConf: public IniFile, public StaticLifeCycleControler<RecalboxConf
     DefineGetterSetterParameterized(ThemeRegion      , String, String, sThemeGeneric, ".region", "")
 
     DefineGetterSetter(Brightness, int, Int, sBrightness, 7)
-    DefineGetterSetter(Clock, bool, Bool, sClock, false)
+    DefineGetterSetter(Clock, bool, Bool, sClock, true)
     DefineGetterSetter(ShowHelp, bool, Bool, sShowHelp, true)
     DefineGetterSetter(ShowGameClipHelpItems, bool, Bool, sShowGameClipHelpItems, true)
     DefineGetterSetter(ShowGameClipClippingItem, bool, Bool, sShowGameClipClippingItem, true)
@@ -222,7 +222,7 @@ class RecalboxConf: public IniFile, public StaticLifeCycleControler<RecalboxConf
 
     DefineGetterSetter(SystemLanguage, String, String, sSystemLanguage, "en_US")
     DefineGetterSetter(SystemKbLayout, String, String, sSystemKbLayout, "us")
-    DefineGetterSetter(SystemManagerEnabled, bool, Bool, sSystemManagerEnabled, true)
+    DefineGetterSetter(SystemManagerEnabled, bool, Bool, sSystemManagerEnabled, false)
 
     DefineGetterSetter(Overclocking, String, String, sOverclocking, "none")
     DefineGetterSetter(Overscan, bool, Bool, sOverscan, false)
@@ -306,14 +306,14 @@ class RecalboxConf: public IniFile, public StaticLifeCycleControler<RecalboxConf
     DefineGetterSetter(ArcadeViewFoldClones, bool, Bool, sArcadeViewFoldClones, false)
     DefineGetterSetter(ArcadeViewHideNonWorking, bool, Bool, sArcadeViewHideNonWorking, false)
 
-    DefineGetterSetter(UpdatesEnabled, bool, Bool, sUpdatesEnabled, true)
+    DefineGetterSetter(UpdatesEnabled, bool, Bool, sUpdatesEnabled, false)
     DefineGetterSetter(UpdatesType, String, String, sUpdatesType, "stable")
 
     DefineGetterSetter(EmulationstationVideoMode, String, String, sEsVideoMode, "")
     DefineGetterSetter(GlobalVideoMode, String, String, sGlobalVideoMode, "")
     DefineGetterSetter(KodiVideoMode, String, String, sKodiVideoMode, "")
     DefineGetterSetter(ESForce43, bool, Bool, sESForce43, false)
-    DefineGetterSetter(SplashEnabled, bool, Bool, sSplashEnabled, true)
+    DefineGetterSetter(SplashEnabled, bool, Bool, sSplashEnabled, false)
 
 
     DefineGetterSetter(BatteryHidden, bool, Bool, sBatteryHidden, false)

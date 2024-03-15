@@ -691,13 +691,15 @@ int GuiSearch::SearchCSV(const char *csv_fname, char **lword, unsigned int start
 }
 
 // Novan: edit here
+#define ES_DIR1 "/recalbox/share_init/system/.emulationstation"
+#define ES_DIR2 "/recalbox/share/system/.emulationstation"
 void GuiSearch::PopulateGrid2(const String& search)
 {
   if (search.length()<3) return;
 
   unsigned int n_found = 0; // total result found
 	struct dirent *entry;
-	DIR *dir;
+	DIR *dir1, *dir2;
 	char *in_keyword = NULL;
 	char **lword;
 	char fullpath[MAX_LINE];
@@ -705,23 +707,35 @@ void GuiSearch::PopulateGrid2(const String& search)
   in_keyword = strdup(search.c_str());
 	SDL_strlwr(in_keyword);
 
-  if ((dir = opendir("/recalbox/share/system/.emulationstation")) == NULL) {
-    mWindow.displayMessage("Error opendir for path /recalbox/share/system/.emulationstation");
-		free(in_keyword);
-	}else{
+  dir1 = opendir(ES_DIR1);
+  dir2 = opendir(ES_DIR2);
+
+  if (dir1) {
 		lword = split_word(in_keyword);
-		entry = readdir(dir);
+		entry = readdir(dir1);
 		do {
 			if (strstr(entry->d_name, ".csv")) {
-				sprintf(fullpath, "/recalbox/share/system/.emulationstation/%s", entry->d_name);
+				sprintf(fullpath, ES_DIR1"/%s", entry->d_name);
 				n_found = SearchCSV(fullpath, lword, n_found);
 			}
-		} while ((entry = readdir(dir)) != NULL);
+		} while ((entry = readdir(dir1)) != NULL);
 		free_word(lword);
-		free(in_keyword);
-		closedir(dir);
-    { LOG(LogDebug) << "[GuiSearch] Found " << n_found << " roms in database"; }
+		closedir(dir1);
 	}
+  if (dir2) {
+		lword = split_word(in_keyword);
+		entry = readdir(dir2);
+		do {
+			if (strstr(entry->d_name, ".csv")) {
+				sprintf(fullpath, ES_DIR2"/%s", entry->d_name);
+				n_found = SearchCSV(fullpath, lword, n_found);
+			}
+		} while ((entry = readdir(dir2)) != NULL);
+		free_word(lword);
+		closedir(dir2);
+	}
+  { LOG(LogDebug) << "[GuiSearch] Found " << n_found << " roms in database"; }
+  free(in_keyword);
 
   if (n_found) mText->setValue("");
 }
