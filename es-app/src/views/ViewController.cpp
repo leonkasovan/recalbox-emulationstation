@@ -589,6 +589,7 @@ void ViewController::LaunchActually(const EmulatorData& emulator)
   GameRunner::Instance().RunGame(*mGameToLaunch, emulator, mGameLinkedData);
   if (mForceGoToGame)
     selectGamelistAndCursor(mGameToLaunch);
+  if (mGameToLaunch->System().Name() == "addon") return;  // skip check elapsed for apps in addon
   TimeSpan elapsed = DateTime() - start;
 
   if (elapsed.TotalMilliseconds() <= 3000) // 3s

@@ -185,10 +185,13 @@ MainRunner::ExitState MainRunner::Run()
     ExitState exitState = ExitState::Quit;
     try
     {
+      if (RecalboxSystem::hasIpAdress(true))
+        window.InfoPopupAdd(new GuiInfoPopup(window, "Connected to WIFI with IP: " + RecalboxSystem::getIpAddress(), 10, PopupType::Recalbox));
+
       // Bios (must be created before the webmanager starts)
       BiosManager biosManager;
       biosManager.LoadFromFile();
-      biosManager.Scan(nullptr);
+      // biosManager.Scan(nullptr);
 
       // Start webserver
       { LOG(LogDebug) << "[MainRunner] Launching Webserver"; }
@@ -200,8 +203,11 @@ MainRunner::ExitState MainRunner::Run()
       RemotePlaylist remotePlaylist;
 
       // Start update thread
-      { LOG(LogDebug) << "[MainRunner] Launching Network thread"; }
-      Upgrade networkThread(window);
+      if (RecalboxConf::Instance().GetUpdatesEnabled()) {
+        { LOG(LogDebug) << "[MainRunner] Launching Network thread"; }
+        Upgrade networkThread(window);
+      }
+    
       // Start the socket server
       { LOG(LogDebug) << "[MainRunner] Launching Command thread"; }
       CommandThread commandThread(systemManager);

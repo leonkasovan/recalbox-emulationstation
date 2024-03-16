@@ -13,7 +13,8 @@ RestApiServer::RestApiServer(SystemManager& systemManager)
   : mRequestHandler(mParam.WWWRoot(), mParam.DefaultFile(), systemManager)
   , mServer(mParam, &mRequestHandler)
 {
-  Start("rest-api");
+  if (RecalboxConf::Instance().GetSystemManagerEnabled()) 
+    Start("rest-api");
 }
 
 void RestApiServer::Run()
