@@ -152,11 +152,11 @@ MainRunner::ExitState MainRunner::Run()
 
       SDL_version compiled;
       SDL_VERSION(&compiled);
-      LOG(LogInfo) << (_F("We compiled against SDL version {0}.{1}.{2}") / (int)compiled.major / (int)compiled.minor / (int)compiled.patch).ToString();
+      LOG(LogDebug) << (_F("[MainRunner] We compiled against SDL version {0}.{1}.{2}") / (int)compiled.major / (int)compiled.minor / (int)compiled.patch).ToString();
 
       SDL_version linked;
       SDL_GetVersion(&linked);
-      LOG(LogInfo) << (_F("But we are linking against SDL version {0}.{1}.{2}") / (int)linked.major / (int)linked.minor/ (int)linked.patch).ToString();
+      LOG(LogDebug) << (_F("[MainRunner] But we are linking against SDL version {0}.{1}.{2}") / (int)linked.major / (int)linked.minor/ (int)linked.patch).ToString();
 
       int numVideoDrivers = SDL_GetNumVideoDrivers();
       buf = "";
@@ -164,7 +164,7 @@ MainRunner::ExitState MainRunner::Run()
         buf += SDL_GetVideoDriver(i);
         buf += ", ";
       }
-      LOG(LogInfo) << "Available video drivers: "<< buf;
+      LOG(LogDebug) << "[MainRunner] Available video drivers: "<< buf;
 
       int numAudioDrivers = SDL_GetNumAudioDrivers();
       buf = "";
@@ -172,21 +172,21 @@ MainRunner::ExitState MainRunner::Run()
         buf += SDL_GetAudioDriver(i);
         buf += ", ";
       }
-      LOG(LogInfo) << "Available audio drivers: " << buf;
+      LOG(LogDebug) << "[MainRunner] Available audio drivers: " << buf;
 
-      LOG(LogInfo) << (_F("Currently using video driver: {0}") / SDL_GetCurrentVideoDriver()).ToString();
-      LOG(LogInfo) << (_F("Currently using audio driver: {0}") / SDL_GetCurrentAudioDriver()).ToString();
+      LOG(LogDebug) << (_F("[MainRunner] Currently using video driver: {0}") / SDL_GetCurrentVideoDriver()).ToString();
+      LOG(LogDebug) << (_F("[MainRunner] Currently using audio driver: {0}") / SDL_GetCurrentAudioDriver()).ToString();
 
-      LOG(LogInfo) << "GL_VENDOR: " << (glGetString(GL_VENDOR) ? (const char*)glGetString(GL_VENDOR) : "");
-      LOG(LogInfo) << "GL_RENDERER: " << (glGetString(GL_RENDERER) ? (const char*)glGetString(GL_RENDERER) : "");
-      LOG(LogInfo) << "GL_VERSION: " << (glGetString(GL_VERSION) ? (const char*)glGetString(GL_VERSION) : "");
+      LOG(LogDebug) << "[MainRunner] GL_VENDOR: " << (glGetString(GL_VENDOR) ? (const char*)glGetString(GL_VENDOR) : "");
+      LOG(LogDebug) << "[MainRunner] GL_RENDERER: " << (glGetString(GL_RENDERER) ? (const char*)glGetString(GL_RENDERER) : "");
+      LOG(LogDebug) << "[MainRunner] GL_VERSION: " << (glGetString(GL_VERSION) ? (const char*)glGetString(GL_VERSION) : "");
     }
 
     ExitState exitState = ExitState::Quit;
     try
     {
-      if (RecalboxSystem::hasIpAdress(true))
-        window.InfoPopupAdd(new GuiInfoPopup(window, "Connected to WIFI with IP: " + RecalboxSystem::getIpAddress(), 10, PopupType::Recalbox));
+      if (RecalboxSystem::hasIpAdress(false))
+        window.InfoPopupAdd(new GuiInfoPopup(window, "Connected to network with IP: " + RecalboxSystem::getIpAddress(), 10, PopupType::Recalbox));
 
       // Bios (must be created before the webmanager starts)
       BiosManager biosManager;
@@ -201,13 +201,9 @@ MainRunner::ExitState MainRunner::Run()
       PatronInfo patronInfo(this);
       // Remote music
       RemotePlaylist remotePlaylist;
-
       // Start update thread
-      if (RecalboxConf::Instance().GetUpdatesEnabled()) {
-        { LOG(LogDebug) << "[MainRunner] Launching Network thread"; }
-        Upgrade networkThread(window);
-      }
-    
+      { LOG(LogDebug) << "[MainRunner] Launching Network thread"; }
+      Upgrade networkThread(window);
       // Start the socket server
       { LOG(LogDebug) << "[MainRunner] Launching Command thread"; }
       CommandThread commandThread(systemManager);

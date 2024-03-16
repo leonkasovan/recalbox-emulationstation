@@ -29,13 +29,14 @@ Upgrade::Upgrade(WindowManager& window)
   : mWindow(window)
   , mSender(*this)
 {
-  Thread::Start("Upgrade");
+  if (RecalboxConf::Instance().GetUpdatesEnabled())
+    Thread::Start("Upgrade");
 }
 
 Upgrade::~Upgrade()
 {
   mSignal.Fire();
-  Thread::Stop();
+  if (IsRunning()) Thread::Stop();
 }
 
 void Upgrade::Run()

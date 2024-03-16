@@ -46,7 +46,7 @@ SystemManager::RomSources SystemManager::GetRomSource(const SystemDescriptor& sy
   else
   {
     roots[systemDescriptor.RomPath().ToString()] = false;
-    { LOG(LogError) << "[System] " << systemDescriptor.RomPath().ToString() << " is a standalone folder."; }
+    { LOG(LogError) << "[System] " << systemDescriptor.RomPath().ToString() << " is a standalone folder because it doesn't contain " << sRootTag; }
   }
 
   return roots;
@@ -281,10 +281,10 @@ void SystemManager::PopulateRegularSystem(SystemData* system)
                                                             rootPath.second ? RootFolderData::Types::ReadOnly : RootFolderData::Types::None);
     FileData::StringMap doppelgangerWatcher;
 
-    { LOG(LogInfo) << "[System] Creating & populating system: " << system->Descriptor().FullName() << " (from " << rootPath.first << ')'; }
+    { LOG(LogDebug) << "[System] Creating & populating system: " << system->Descriptor().FullName() << " (from " << rootPath.first << ')'; }
 
     // Populate items from disk
-    bool loadFromDisk = mForceReload || !RecalboxConf::Instance().GetStartupGamelistOnly();
+    bool loadFromDisk = mForceReload || (!RecalboxConf::Instance().GetStartupGamelistOnly() && rootPath.first.Contains("/share/") );
     if (loadFromDisk)
       system->populateFolder(root, doppelgangerWatcher);
 
@@ -292,7 +292,7 @@ void SystemManager::PopulateRegularSystem(SystemData* system)
     system->ParseGamelistXml(root, doppelgangerWatcher, mForceReload);
 
     #ifdef DEBUG
-    { LOG(LogInfo) << "[System] " << root.CountAll(false, FileData::Filter::None) << " games found for " << system->Descriptor().FullName() << " in " << rootPath.first; }
+    { LOG(LogDebug) << "[System] " << root.CountAll(false, FileData::Filter::None) << " games found for " << system->Descriptor().FullName() << " in " << rootPath.first; }
     #endif
   }
 }
@@ -585,7 +585,7 @@ void SystemManager::PopulateVirtualSystemWithSystem(SystemData* system, const Li
     if (!source->IsVirtual())
       if (FileData::List all = includesubfolder ? source->getAllGames() : source->getTopGamesAndFolders(); !all.empty())
       {
-        { LOG(LogWarning) << "[System] Add games from " << source->Name() << " into " << system->FullName(); }
+        { LOG(LogDebug) << "[System] Add games from " << source->Name() << " into " << system->FullName(); }
         for (auto* fd : all)
           system->LookupOrCreateGame(root, fd->TopAncestor().RomPath(), fd->RomPath(), fd->Type(), doppelganger);
       }
@@ -596,7 +596,7 @@ void SystemManager::PopulateVirtualSystemWithGames(SystemData* system, const Fil
   if (!games.empty())
   {
     RootFolderData& root = system->CreateRootFolder(Path(), RootFolderData::Ownership::FolderOnly, RootFolderData::Types::Virtual);
-    { LOG(LogWarning) << "[System] Add " << games.size() << " games into " << system->FullName(); }
+    { LOG(LogDebug) << "[System] Add " << games.size() << " games into " << system->FullName(); }
     for (auto* fd : games)
       system->LookupOrCreateGame(root, fd->TopAncestor().RomPath(), fd->RomPath(), fd->Type(), doppelganger);
   }
@@ -798,7 +798,7 @@ SystemData* SystemManager::ThreadPoolRunJob(SystemDescriptor& systemDescriptor)
   try
   {
     SystemData* newSys = CreateRegularSystem(systemDescriptor);
-    { LOG(LogWarning) << "[System] Adding \"" << systemDescriptor.Name() << "\" in system list."; }
+    { LOG(LogDebug) << "[System] Adding \"" << systemDescriptor.Name() << "\" in system list."; }
     return newSys;
   }
   catch(std::exception& ex)
@@ -920,11 +920,9 @@ bool SystemManager::LoadSystems(const DescriptorList& systemList, FileNotifier* 
   { LOG(LogInfo) << "[System] Gamelist load time: " << std::to_string((DateTime()-start).TotalMilliseconds()) << "ms"; }
 
   // Cleanup metadata
-  start = DateTime();
   MetadataDescriptor::CleanupHolders();
 
   // Phase #2
-  start = DateTime();
   NotifyLoadingPhase(ISystemLoadingPhase::Phase::VirtualSystems);
 
   if (!novirtuals)
@@ -940,13 +938,11 @@ bool SystemManager::LoadSystems(const DescriptorList& systemList, FileNotifier* 
   }
 
   // Sort systems based on conf option
-  start = DateTime();
   mOriginalOrderedSystems = mAllSystems;
   SystemSorting();
 
   // Add gamelist watching
   if (gamelistWatcher != nullptr){
-    start = DateTime();
     WatchGameList(*gamelistWatcher);
   }
 

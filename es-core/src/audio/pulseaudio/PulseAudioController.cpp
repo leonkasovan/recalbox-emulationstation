@@ -127,14 +127,14 @@ void PulseAudioController::ContextStateCallback(pa_context *context, void *userd
 		case PA_CONTEXT_FAILED:
 		case PA_CONTEXT_TERMINATED:
     {
-      { LOG(LogInfo) << "[PulseAudio] Disconnected from PulseAudio server."; }
+      { LOG(LogDebug) << "[PulseAudio] Disconnected from PulseAudio server."; }
       This.mConnectionState = ConnectionState::Closed;
       This.mSignal.Fire();
       break;
     }
 		case PA_CONTEXT_READY:
     {
-      { LOG(LogInfo) << "[PulseAudio] Connected to PulseAudio server."; }
+      { LOG(LogDebug) << "[PulseAudio] Connected to PulseAudio server."; }
       This.mConnectionState = ConnectionState::Ready;
       This.mSignal.Fire();
 
@@ -145,7 +145,7 @@ void PulseAudioController::ContextStateCallback(pa_context *context, void *userd
 
       if (o != nullptr)
       {
-        { LOG(LogInfo) << "[PulseAudio] Subscribed to card and sink event."; }
+        { LOG(LogDebug) << "[PulseAudio] Subscribed to card and sink event."; }
         pa_operation_unref(o);
       }
       break;
@@ -602,7 +602,7 @@ bool PulseAudioController::IsPortAvailable(const String& portName)
 void PulseAudioController::UpdateDefaultSink()
 {
 
-  { LOG(LogInfo) << "[PulseAudio] Get server info"; }
+  { LOG(LogDebug) << "[PulseAudio] Get server info"; }
 
   pa_operation* serverInfoOp = pa_context_get_server_info(mPulseAudioContext, GetServerInfoCallback, this);
   // Wait for response
@@ -914,7 +914,7 @@ void PulseAudioController::PulseContextConnect()
 {
   // Wait for response
   mSignal.WaitSignal(sTimeOut);
-  { LOG(LogInfo) << "[PulseAudio] Connection to PulseAudio complete."; }
+  { LOG(LogDebug) << "[PulseAudio] Connection to PulseAudio complete."; }
 }
 
 void PulseAudioController::PulseContextDisconnect()
@@ -1049,7 +1049,7 @@ void PulseAudioController::PulseEnumerateSinks()
   mSyncer.UnLock();
 
   // Enumerate cards
-  { LOG(LogInfo) << "[PulseAudio] Enumerating Sinks."; }
+  { LOG(LogDebug) << "[PulseAudio] Enumerating Sinks."; }
   pa_operation* sinkOp = pa_context_get_sink_info_list(mPulseAudioContext, EnumerateSinkCallback, this);
   // Wait for response
   mSignal.WaitSignal(sTimeOut);
@@ -1064,7 +1064,7 @@ void PulseAudioController::PulseEnumerateCards()
   mSyncer.UnLock();
 
   // Enumerate cards
-  { LOG(LogInfo) << "[PulseAudio] Enumerating Cards."; }
+  { LOG(LogDebug) << "[PulseAudio] Enumerating Cards."; }
   pa_operation* cardOp = pa_context_get_card_info_list(mPulseAudioContext, EnumerateCardCallback, this);
   // Wait for response
   mSignal.WaitSignal(sTimeOut);
@@ -1078,7 +1078,7 @@ void PulseAudioController::PulseEnumerateCards()
 
 void PulseAudioController::PulseSubscribe()
 {
-  { LOG(LogInfo) << "[PulseAudio] Subscribing to events"; }
+  { LOG(LogDebug) << "[PulseAudio] Subscribing to events"; }
 
   pa_context_set_subscribe_callback(mPulseAudioContext, SubscriptionCallback, this);
   pa_context_subscribe(mPulseAudioContext, PA_SUBSCRIPTION_MASK_ALL, nullptr, nullptr);
