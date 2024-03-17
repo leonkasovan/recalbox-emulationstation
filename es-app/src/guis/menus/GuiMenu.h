@@ -34,6 +34,7 @@ class GuiMenu : public GuiMenuBase
       Bios,
       License,
       Quit,
+      Help,
     };
 
     //! SystemManager instance
