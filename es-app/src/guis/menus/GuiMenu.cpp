@@ -21,6 +21,7 @@
 #include "GuiMenuArcade.h"
 #include "GuiMenuDownloadGamePacks.h"
 #include <guis/GuiScraperRun.h>
+#include <guis/GuiMsgBoxScroll2.h>
 
 GuiMenu::GuiMenu(WindowManager& window, SystemManager& systemManager)
   : GuiMenuBase(window, _("MAIN MENU"), this)
@@ -110,59 +111,6 @@ GuiMenu::GuiMenu(WindowManager& window, SystemManager& systemManager)
   setAnimation(new LambdaAnimation(fadeFunc, 200), 0);
 }
 
-#define ES_DIR1 "/recalbox/share_init/system/.emulationstation"
-#define BUFFER_SIZE 1024
-
-int ReadHelpContent(const char *filename, int content_number, String &content){
-    FILE *fi = fopen(filename, "r");
-    if (fi == NULL) {
-        return -1;
-    }
-
-    if (content_number <= 0) {
-        fclose(fi);
-        return -2;
-    }
-
-    char buffer[BUFFER_SIZE];
-    int current_content = 0;
-    size_t bytes_read;
-    char *pos;
-    content = "";
-
-    while ((bytes_read = fread(buffer, 1, BUFFER_SIZE, fi)) > 0) {
-        pos = buffer;
-        while ((pos = strchr(pos, '|')) != NULL) {
-            current_content++;
-            if (current_content == content_number) {
-                pos++; // Move past the '|'
-                if (*pos == '\r') pos++;
-                if (*pos == '\n') pos++;
-                while (((size_t)(pos - buffer) < bytes_read) && (*pos != '|') ){
-                    content.Append(*pos);
-                    pos++;
-                }
-                if ((size_t)(pos - buffer) == bytes_read){
-                    int done = 0;
-                    while (!done && (bytes_read = fread(buffer, 1, BUFFER_SIZE, fi)) > 0) {
-                        pos = buffer;
-                        while (((size_t)(pos - buffer) < bytes_read) && (*pos != '|') ){
-                            content.Append(*pos);
-                            pos++;
-                        }
-                        if (*pos == '|') done = 1;
-                    }
-                }
-                fclose(fi);
-                return 0;
-            }
-            pos++;
-        }
-    }
-    fclose(fi);
-    return -3;
-}
-
 void GuiMenu::SubMenuSelected(int id)
 {
   switch((Components)id)
@@ -205,15 +153,7 @@ void GuiMenu::SubMenuSelected(int id)
       break;
     }
     case Components::Quit: mWindow.pushGui(new GuiMenuQuit(mWindow)); break;
-    case Components::Help:
-    {
-      String content;
-      int content_number = 2;
-      if (ReadHelpContent(ES_DIR1 "/recalbox_help.txt",content_number,content) == 0){
-        mWindow.pushGui(new GuiMsgBoxScroll(mWindow, "HELP", content, _("OK"), nullptr, "", nullptr, "", nullptr, TextAlignment::Left));
-      }
-      break;
-    }
+    case Components::Help: mWindow.pushGui(new GuiMsgBoxScroll2(mWindow, "Recalbox Guides", content, _("OK"), nullptr, "", nullptr, "", nullptr, TextAlignment::Left)); break;
   }
 }
 
