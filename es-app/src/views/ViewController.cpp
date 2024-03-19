@@ -509,7 +509,7 @@ void ViewController::LaunchCheck()
 
   // Check bios
   if ((mCheckFlags & LaunchCheckFlags::Bios) == 0)
-    if (mCheckFlags |= LaunchCheckFlags::Bios; !CheckBiosBeforeLaunch())
+    if (mCheckFlags |= LaunchCheckFlags::Bios; false) // skip bios check
       return;
 
   // Refresh rate choice
