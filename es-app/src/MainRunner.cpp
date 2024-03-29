@@ -37,6 +37,50 @@
 #include <emulators/run/GameRunner.h>
 #include <sdl2/Sdl2Init.h>
 #include <patreon/PatronInfo.h>
+// #include <utils/os/system/Thread.h>
+
+class CheckNetwork : private Thread
+{
+  public:
+  explicit CheckNetwork(WindowManager& window);
+  ~CheckNetwork() override;
+
+  private:
+  WindowManager& mWindow;
+  void Run() override;
+};
+
+CheckNetwork::CheckNetwork(WindowManager& window)
+  : mWindow(window)
+{
+  if (RecalboxConf::Instance().GetWifiEnabled())
+    Thread::Start("CheckNetwork");
+}
+
+CheckNetwork::~CheckNetwork()
+{
+  if (IsRunning()) Thread::Stop();
+}
+
+void CheckNetwork::Run()
+{
+  int done = 0;
+  Sleep(1000);
+
+  do {
+    if (RecalboxSystem::hasIpAdress(false)){
+      String IP = RecalboxSystem::getIpAddress();
+      const char *ip = IP.c_str();
+      if (ip[3] == '.'){
+        mWindow.InfoPopupAdd(new GuiInfoPopup(mWindow, "Connected to network with IP: " + IP, 10, PopupType::Recalbox));
+        done = 1;
+      }else if (ip[2] == ':'){
+        mWindow.InfoPopupAdd(new GuiInfoPopup(mWindow, "Connecting to network \nwith MAC: " + IP + " ...", 10, PopupType::Recalbox));
+        Sleep(1000);
+      }
+    }
+  } while (!done);
+}
 
 MainRunner::ExitState MainRunner::sRequestedExitState = MainRunner::ExitState::Quit;
 bool MainRunner::sQuitRequested = false;
@@ -185,9 +229,6 @@ MainRunner::ExitState MainRunner::Run()
     ExitState exitState = ExitState::Quit;
     try
     {
-      if (RecalboxSystem::hasIpAdress(false))
-        window.InfoPopupAdd(new GuiInfoPopup(window, "Connected to network with IP: " + RecalboxSystem::getIpAddress(), 10, PopupType::Recalbox));
-
       // Bios (must be created before the webmanager starts)
       BiosManager biosManager;
       biosManager.LoadFromFile();
@@ -232,6 +273,9 @@ MainRunner::ExitState MainRunner::Run()
       // Enable joystick autopairing
       if(RecalboxConf::Instance().GetAutoPairOnBoot())
         mBTAutopairManager.StartDiscovery();
+
+      // Start Check Network thread
+      CheckNetwork cn(window);
 
       // Main Loop!
       CreateReadyFlagFile();
