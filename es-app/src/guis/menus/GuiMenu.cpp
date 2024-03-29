@@ -22,6 +22,7 @@
 #include "GuiMenuDownloadGamePacks.h"
 #include <guis/GuiScraperRun.h>
 #include <guis/GuiMsgBoxScroll2.h>
+#include <guis/wizards/WizardRG353X.h>
 
 GuiMenu::GuiMenu(WindowManager& window, SystemManager& systemManager)
   : GuiMenuBase(window, _("MAIN MENU"), this)
@@ -93,8 +94,11 @@ GuiMenu::GuiMenu(WindowManager& window, SystemManager& systemManager)
   // License
   AddSubMenu(_("OPEN-SOURCE LICENSE"), mTheme.menuIconSet.license, (int)Components::License);
 
-  // License
+  // Help and Guide
   AddSubMenu(_("HELP"), mTheme.menuIconSet.license, (int)Components::Help);
+
+  // Wizard
+  AddSubMenu(_("WIZARD"), mTheme.menuIconSet.license, (int)Components::Wizard);
 
   // Quit
   AddSubMenu(_("QUIT"), mTheme.menuIconSet.quit, (int)Components::Quit);
@@ -153,7 +157,9 @@ void GuiMenu::SubMenuSelected(int id)
       break;
     }
     case Components::Quit: mWindow.pushGui(new GuiMenuQuit(mWindow)); break;
-    case Components::Help: mWindow.pushGui(new GuiMsgBoxScroll2(mWindow, "Recalbox Guides", content, _("OK"), nullptr, "", nullptr, "", nullptr, TextAlignment::Left)); break;
+    case Components::Help: mWindow.pushGui(new GuiMsgBoxScroll2(mWindow, "Recalbox Guides", "content", _("OK"), nullptr, "", nullptr, "", nullptr, TextAlignment::Left)); break;
+    case Components::Wizard: mWindow.pushGui(new WizardRG353X(mWindow)); break;
+      break;
   }
 }
 

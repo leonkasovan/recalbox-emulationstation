@@ -35,6 +35,7 @@ class GuiMenu : public GuiMenuBase
       License,
       Quit,
       Help,
+      Wizard,
     };
 
     //! SystemManager instance
