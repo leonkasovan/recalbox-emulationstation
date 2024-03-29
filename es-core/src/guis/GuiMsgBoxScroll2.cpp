@@ -6,7 +6,7 @@
 #define ES_DIR1 "/recalbox/share_init/system/.emulationstation"
 #define BUFFER_SIZE 1024
 
-int ReadHelpContent(const char *filename, int content_number, String &content){
+int ReadHelpContent(const char *filename, int content_number, String &content, String &title){
     FILE *fi = fopen(filename, "r");
     if (fi == NULL) {
         return -1;
@@ -19,9 +19,11 @@ int ReadHelpContent(const char *filename, int content_number, String &content){
 
     char buffer[BUFFER_SIZE];
     int current_content = 0;
+    int line = 0;
     size_t bytes_read;
     char *pos;
     content = "";
+    title = "";
 
     while ((bytes_read = fread(buffer, 1, BUFFER_SIZE, fi)) > 0) {
         pos = buffer;
@@ -34,6 +36,14 @@ int ReadHelpContent(const char *filename, int content_number, String &content){
                 while (((size_t)(pos - buffer) < bytes_read) && (*pos != '|') ){
                     content.Append(*pos);
                     pos++;
+                    if (*pos == '\n') {
+                        if (line == 0){
+                            title = content;
+                            content = "";
+                            // { LOG(LogError) << "line=" << line << " content=" << content; }
+                        }
+                        line++;
+                    }
                 }
                 if ((size_t)(pos - buffer) == bytes_read){
                     int done = 0;
@@ -42,12 +52,20 @@ int ReadHelpContent(const char *filename, int content_number, String &content){
                         while (((size_t)(pos - buffer) < bytes_read) && (*pos != '|') ){
                             content.Append(*pos);
                             pos++;
+                            if (*pos == '\n') {
+                                if (line == 0){
+                                    title = content;
+                                    content = "";
+                                    // { LOG(LogError) << "line=" << line << " content=" << content; }
+                                }
+                                line++;
+                            }
                         }
                         if (*pos == '|') done = 1;
                     }
                 }
                 fclose(fi);
-                return 0;
+                if (content.length()) return 0; else return -2;
             }
             pos++;
         }
@@ -113,8 +131,8 @@ GuiMsgBoxScroll2::GuiMsgBoxScroll2(WindowManager& window,
 	mButtonGrid = makeButtonGrid(mWindow, mButtons);
 	mGrid.setEntry(mButtonGrid, Vector2i(0, 2), true, false, Vector2i(1, 1));
 	mMsg->setSize(width, 0);
-	const float msgHeight = Math::min(Renderer::Instance().DisplayHeightAsFloat() * 0.5f, mMsg->getSize().y());
-    { LOG(LogError) << "msgHeight=" << msgHeight << " mMsg->getSize().y()=" << mMsg->getSize().y(); }
+	const float msgHeight = Renderer::Instance().DisplayHeightAsFloat() * 0.5f;
+    // { LOG(LogError) << "msgHeight=" << msgHeight << " mMsg->getSize().y()=" << mMsg->getSize().y(); }
 	mMsgContainer->setSize(width, msgHeight);
 	setSize(width + mSpace*2, mButtonGrid->getSize().y() + msgHeight + mTitle->getSize().y());
 
@@ -125,14 +143,18 @@ GuiMsgBoxScroll2::GuiMsgBoxScroll2(WindowManager& window,
 	addChild(&mGrid);
 
     content_number = 1;
-    String content = ""; 
-    if (ReadHelpContent(ES_DIR1 "/recalbox_help.txt",content_number,content) == 0)
+    String content = "";
+    String help_title = "";
+    if (ReadHelpContent(ES_DIR1 "/recalbox_help.txt",content_number,content,help_title) == 0){
+        mTitle->setText(help_title);
         mMsg->setText(content);
+    }
 }
 
 bool GuiMsgBoxScroll2::ProcessInput(const InputCompactEvent& event)
 {
     String content = "";
+    String help_title = "";
 	// special case for when GuiMsgBox comes up to report errors before anything has been configured
 	/* when it's not configured, allow to remove the message box too to allow the configdevice window a chance */
 	if(mAcceleratorFunc && event.AskForConfiguration())
@@ -146,14 +168,18 @@ bool GuiMsgBoxScroll2::ProcessInput(const InputCompactEvent& event)
 	if (event.L1Pressed()){
         --content_number;
         if (content_number < 1) content_number = 1;
-        if (ReadHelpContent(ES_DIR1 "/recalbox_help.txt",content_number,content) == 0){
+        if (ReadHelpContent(ES_DIR1 "/recalbox_help.txt",content_number,content,help_title) == 0){
+            // { LOG(LogError) << "content.length()=" << content.length(); }
+            mTitle->setText(help_title);
             mMsg->setText(content);
             mMsgContainer->reset();
             // onSizeChanged();
         }
 	}else if (event.R1Pressed()){
         ++content_number;
-        if (ReadHelpContent(ES_DIR1 "/recalbox_help.txt",content_number,content) == 0){
+        if (ReadHelpContent(ES_DIR1 "/recalbox_help.txt",content_number,content,help_title) == 0){
+            // { LOG(LogError) << "content.length()=" << content.length(); }
+            mTitle->setText(help_title);
             mMsg->setText(content);
             mMsgContainer->reset();
             // onSizeChanged();
