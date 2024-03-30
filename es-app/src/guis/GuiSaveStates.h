@@ -61,6 +61,8 @@ class GuiSaveStates : public Gui
 
     void Delete();
 
+    void Scrape();
+
     static bool asc(const SaveState& first, const SaveState& second)
     {
       if(first.GetIsAuto())

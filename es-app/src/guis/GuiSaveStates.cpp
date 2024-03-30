@@ -94,6 +94,12 @@ bool GuiSaveStates::ProcessInput(const class InputCompactEvent & event)
     Close();
     return true;
   }
+  else if (event.L2Pressed())
+  {
+    Scrape();
+    Close();
+    return true;
+  }
   else if (event.YPressed())
   {
     launch(-1);
@@ -147,6 +153,7 @@ bool GuiSaveStates::getHelpPrompts(Help& help)
   String sort = mSort == Sort::Descending ? "ASC" : "DESC";
 
   help.Set(HelpType::UpDown, _("CHOOSE"))
+      .Set(HelpType::L2R2, _("SCRAPE"))
       .Set(Help::Cancel(), _("BACK"))
       .Set(HelpType::Select, _("CHANGE ORDER") + " " + sort);
 
@@ -256,6 +263,13 @@ void GuiSaveStates::Delete()
   (void)mCurrentState.GetThrumbnail().Delete();
   updateHelpPrompts();
   { LOG(LogDebug) << "[SAVESTATE] " << mCurrentState.GetPath().Filename() << " slot has been deleted"; }
+}
+
+void GuiSaveStates::Scrape()
+{
+  mGame.Metadata().SetImagePath(mCurrentState.GetThrumbnail());
+  updateHelpPrompts();
+  { LOG(LogDebug) << "[SAVESTATE] " << mCurrentState.GetPath().Filename() << " slot has been scraped"; }
 }
 
 //non compatibl libretro core pi4
