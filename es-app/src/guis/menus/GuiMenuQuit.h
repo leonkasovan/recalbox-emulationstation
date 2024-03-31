@@ -19,6 +19,7 @@ class GuiMenuQuit : public GuiMenuBase
       Shutdown,
       FastShutdown,
       Reboot,
+      QuitGui,
     };
 
     /*

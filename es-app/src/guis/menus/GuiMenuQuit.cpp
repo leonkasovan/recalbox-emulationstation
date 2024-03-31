@@ -23,6 +23,9 @@ GuiMenuQuit::GuiMenuQuit(WindowManager& window)
 
   // Reboot
   AddSubMenu(_("RESTART SYSTEM"), (int)Components::Reboot);
+
+  // Quit ES
+  AddSubMenu(_("QUIT GUI FRONTEND"), (int)Components::QuitGui);
 }
 
 void GuiMenuQuit::PushQuitGui(WindowManager& window)
@@ -50,6 +53,12 @@ void GuiMenuQuit::SubMenuSelected(int id)
     {
       mWindow.pushGui(new GuiMsgBox(mWindow, _("REALLY RESTART?"), _("YES"),
                                         [] { MainRunner::RequestQuit(MainRunner::ExitState::NormalReboot); }, _("NO"), nullptr));
+      break;
+    }
+    case Components::QuitGui:
+    {
+      mWindow.pushGui(new GuiMsgBox(mWindow, _("REALLY QUIT GUI?"), _("YES"),
+                                        [] { MainRunner::RequestQuit(MainRunner::ExitState::Quit); }, _("NO"), nullptr));
       break;
     }
   }
