@@ -94,7 +94,7 @@ bool GuiSaveStates::ProcessInput(const class InputCompactEvent & event)
     Close();
     return true;
   }
-  else if (event.L2Pressed())
+  else if (event.L1Pressed())
   {
     Scrape();
     Close();
@@ -153,7 +153,7 @@ bool GuiSaveStates::getHelpPrompts(Help& help)
   String sort = mSort == Sort::Descending ? "ASC" : "DESC";
 
   help.Set(HelpType::UpDown, _("CHOOSE"))
-      .Set(HelpType::L2R2, _("SCRAPE"))
+      .Set(HelpType::L, _("SCRAPE"))
       .Set(Help::Cancel(), _("BACK"))
       .Set(HelpType::Select, _("CHANGE ORDER") + " " + sort);
 
