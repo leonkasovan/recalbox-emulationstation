@@ -15,6 +15,7 @@
 #include <views/ViewController.h>
 #include <LibretroRatio.h>
 #include "games/GameFilesUtils.h"
+#include <guis/GuiScrapeLocal.h>
 
 GuiMenuGamelistGameOptions::GuiMenuGamelistGameOptions(WindowManager& window, ISimpleGameListView& view, SystemManager& systemManager, SystemData& system, FileData& game)
   : GuiMenuBase(window, _("GAME OPTIONS"), this)
@@ -76,9 +77,13 @@ GuiMenuGamelistGameOptions::GuiMenuGamelistGameOptions(WindowManager& window, IS
   if (mGame.IsGame())
     mRotation = AddSwitch(_("Rotation"), mGame.Metadata().Rotation() != RotationType::None, (int)Components::Rotation, this);
 
-  // Scrape
+  // Scrape Online
   if (mGame.IsGame())
-    AddSubMenu(_("SCRAPE"), (int)Components::Scrape);
+    AddSubMenu(_("SCRAPE ONLINE"), (int)Components::Scrape);
+
+  // Scrape Local (screenshots)
+  if (mGame.IsGame()) // and there is screenshots for this game
+    AddSubMenu(_("SCRAPE LOCAL"), (int)Components::ScrapeLocal);
 
 
 //  _N("%i GAME HIDDEN", "%i GAMES HIDDEN", data.Hidden)) .Replace("%i", String(data.Hidden)
@@ -237,6 +242,7 @@ void GuiMenuGamelistGameOptions::SwitchComponentChanged(int id, bool& status)
     case Components::Rating:
     case Components::Genre:
     case Components::Scrape:
+    case Components::ScrapeLocal:
     case Components::Ratio:
     case Components::Emulator:
     case Components::Patch:
@@ -256,6 +262,9 @@ void GuiMenuGamelistGameOptions::SubMenuSelected(int id)
 {
   if ((Components)id == Components::Scrape)
     mWindow.pushGui(new GuiScraperSingleGameRun(mWindow, mSystemManager, mGame, this));
+
+  if ((Components)id == Components::ScrapeLocal)
+    mWindow.pushGui(new GuiScrapeLocal(mWindow, mGame));
 }
 
 void GuiMenuGamelistGameOptions::ScrapingComplete(FileData& game, MetadataType changedMetadata)

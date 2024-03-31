@@ -43,6 +43,7 @@ class GuiMenuGamelistGameOptions : public GuiMenuBase
       Rating,
       Genre,
       Scrape,
+      ScrapeLocal,
       Rotation,
     };
 
