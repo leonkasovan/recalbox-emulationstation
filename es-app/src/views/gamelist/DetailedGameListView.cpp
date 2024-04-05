@@ -640,14 +640,14 @@ void DetailedGameListView::Update(int deltatime)
   if (mList.isScrolling())
     mVideo.setVideo(Path::Empty, 0, 0);
 
-  if (!mSystem.IsScreenshots())
+  if (!mSystem.IsScreenshots() && mSystem.Name() != "pico8" && mSystem.Name() != "imageviewer")
   {
     // Need busy animation?
     ScraperSeamless& scraper = ScraperSeamless::Instance();
     FileData* game = getCursor();
     mIsScraping = false;
     if (game != nullptr)
-      if (game->IsGame())
+      if (game->IsGame() && !game->Metadata().HasImage())
       {
         // Currently scraping?
         mIsScraping = (scraper.HowLong(game) > sMaxScrapingTimeBeforeBusyAnim);
