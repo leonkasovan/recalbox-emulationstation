@@ -32,7 +32,7 @@ class GuiScrapeLocal : public Gui
 
     void onSizeChanged() override;
     void updateInformations();
-    void PopulateGrid();
+    void PopulateGrid(bool All = false);
 
 //     void Update(int deltaTime) override;
 

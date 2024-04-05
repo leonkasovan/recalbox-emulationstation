@@ -79,11 +79,17 @@ bool GuiScrapeLocal::ProcessInput(const class InputCompactEvent & event)
     mGame.Metadata().SetImagePath(Path(fullpath));
     Close();
     return true;
+  }else if (event.R2Pressed()){
+    PopulateGrid(true);
+    return true;
+  }else if (event.L2Pressed()){
+    PopulateGrid(false);
+    return true;
   }
   return Component::ProcessInput(event);
 }
 
-void GuiScrapeLocal::PopulateGrid()
+void GuiScrapeLocal::PopulateGrid(bool All)
 {
 
   if (mList) mList->clear();
@@ -96,7 +102,10 @@ void GuiScrapeLocal::PopulateGrid()
   if (dir1) {
     entry = readdir(dir1);
     do {
-        if (strstr(entry->d_name, ".png")) { 
+        if (strstr(entry->d_name, ".png")) {
+            if (!All) {
+              if (!strstr(entry->d_name, mGame.Metadata().RomFileOnly().FilenameWithoutExtension().c_str())) continue;
+            }
             { LOG(LogDebug) << "[GuiScrapeLocal.cpp] entry->d_name=" << entry->d_name; }
             ed = std::make_shared<TextComponent>(mWindow, entry->d_name, mMenuTheme->menuText.font, mMenuTheme->menuText.color,TextAlignment::Left);
             row.elements.clear();
