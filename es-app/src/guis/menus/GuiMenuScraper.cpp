@@ -20,7 +20,7 @@ GuiMenuScraper::GuiMenuScraper(WindowManager& window, SystemManager& systemManag
 {
   mScrapers = AddList<ScraperType>(_("SCRAPE FROM"), (int)Components::Scraper, this, GetScrapersEntries(), _(MENUMESSAGE_SCRAPER_FROM_HELP_MSG));
 
-  if (PatronInfo::Instance().IsPatron())
+  // if (PatronInfo::Instance().IsPatron())
     AddSwitch(_("AUTOMATIC SCRAPING"), RecalboxConf::Instance().GetScraperAuto(), (int)Components::ScraperAuto, this);
 
   AddSubMenu(_("SCRAPER OPTIONS"), (int)Components::ScraperOptions);
