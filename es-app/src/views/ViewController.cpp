@@ -16,7 +16,7 @@
 #include <MainRunner.h>
 #include <bios/BiosManager.h>
 #include <guis/GuiMsgBox.h>
-
+#include <utils/Files.h>
 #include <games/GameFilesUtils.h>
 
 ViewController::ViewController(WindowManager& window, SystemManager& systemManager)
@@ -597,8 +597,14 @@ void ViewController::LaunchActually(const EmulatorData& emulator)
     // Build text
     String text = _("It seems that your game didn't start at all!\n\nIt's most likely due to either:\n- bad rom\n- missing/bad mandatory bios files\n- missing/bad optional BIOS files (but required for this very game)");
     // Show the dialog box
-    Gui* gui = new GuiMsgBox(mWindow, text, _("OK"), TextAlignment::Left);
-    mWindow.pushGui(gui);
+    // Gui* gui = new GuiMsgBox(mWindow, text, _("OK"), TextAlignment::Left);
+    // mWindow.pushGui(gui);
+    mWindow.pushGui(new GuiMsgBox(mWindow, text,
+      _("CLOSE"), nullptr,
+      _("VIEW LOGS"), [this]{
+        mWindow.pushGui(new GuiMsgBoxScroll(mWindow, "LOG", Files::LoadFile(Path("/recalbox/share/system/logs/es_launch_stderr.log")) + Files::LoadFile(Path("/recalbox/share/system/logs/es_launch_stdout.log")),
+                        _("OK"), nullptr, "", nullptr, "", nullptr, TextAlignment::Left));
+      }));
   }
 }
 
