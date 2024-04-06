@@ -63,7 +63,7 @@ void GuiScrapeLocal::onSizeChanged()
 bool GuiScrapeLocal::getHelpPrompts(Help& help)
 {
   mGrid.getHelpPrompts(help);
-  help.Set(Help::Cancel(), _("CANCEL")).Set(Help::Valid(), _("SCRAPE"));
+  help.Set(Help::Cancel(), _("CANCEL")).Set(Help::Valid(), _("SCRAPE")).Set(HelpType::L2R2, "FILTER");
   return true;
 }
 
