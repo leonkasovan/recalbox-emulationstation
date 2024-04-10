@@ -65,7 +65,7 @@ CheckNetwork::~CheckNetwork()
 void CheckNetwork::Run()
 {
   int done = 0;
-  Sleep(1000);
+  Sleep(2000);
 
   do {
     if (RecalboxSystem::hasIpAdress(false)){
@@ -74,9 +74,9 @@ void CheckNetwork::Run()
       if (ip[3] == '.'){
         mWindow.InfoPopupAdd(new GuiInfoPopup(mWindow, "Connected to network with IP: " + IP, 10, PopupType::Recalbox));
         done = 1;
-      }else if (ip[2] == ':'){
+      }else if (ip[2] == ':' || ip[4] == ':'){
         mWindow.InfoPopupAdd(new GuiInfoPopup(mWindow, "Connecting to network \nwith MAC: " + IP + " ...", 10, PopupType::Recalbox));
-        Sleep(1000);
+        Sleep(2000);
       }
     }
   } while (!done);
@@ -1011,11 +1011,14 @@ void MainRunner::Completed(const HardwareTriggeredSpecialOperations& parameter, 
 void MainRunner::VolumeDecrease(BoardType board, float percent)
 {
   (void)board;
+  char cmd[1024];
 
   int value = RecalboxConf::Instance().GetAudioVolume() - (int)(100 * percent);
   value = Math::clampi(value, 0, 100);
   value = (value / 10) * 10;
-  AudioController::Instance().SetVolume(value);
+  // AudioController::Instance().SetVolume(value);
+  snprintf(cmd, 1203, "amixer set Master %d%%", value);
+  system(cmd);
   RecalboxConf::Instance().SetAudioVolume(value);
   RecalboxConf::Instance().Save();
 }
@@ -1023,11 +1026,14 @@ void MainRunner::VolumeDecrease(BoardType board, float percent)
 void MainRunner::VolumeIncrease(BoardType board, float percent)
 {
   (void)board;
+  char cmd[1024];
 
   int value = RecalboxConf::Instance().GetAudioVolume() + (int)(100 * percent);
   value = Math::clampi(value, 0, 100);
   value = (value / 10) * 10;
-  AudioController::Instance().SetVolume(value);
+  // AudioController::Instance().SetVolume(value); // change using amixer x%
+  snprintf(cmd, 1203, "amixer set Master %d%%", value);
+  system(cmd);
   RecalboxConf::Instance().SetAudioVolume(value);
   RecalboxConf::Instance().Save();
 }
@@ -1086,12 +1092,13 @@ void MainRunner::NoRomPathFound(const DeviceMount& device)
     mApplicationWindow->pushGui((new GuiWaitLongExecution<USBInitialization, bool>(*mApplicationWindow, *this))->Execute(init, _("Initializing share folders...")));
   };
 
-  String text = _("The USB device %NAME% with no rom folder and no share folder has been plugged in! Would you like to initialize this device?");
+  String text = _("The USB device %NAME% (%MOUNTPOINT%) with no rom folder and no share folder has been plugged in! Would you like to initialize this device?");
   text.Append('\n')
       .Append(_("• Choose '%INIT%' to create only all the rom folders")).Append('\n')
       .Append(_("• Choose '%MOVE%' to copy all the current share to the new device, automatically switch to this device, and reboot")).Append('\n')
       .Append(_("• Or just chose '%CANCEL%' to do nothing with this new device"))
       .Replace("%NAME%", device.Name())
+      .Replace("%MOUNTPOINT%", device.MountPoint().ToString())
       .Replace("%INIT%", _("INITIALIZE"))
       .Replace("%MOVE%", _("MOVE SHARE"))
       .Replace("%CANCEL%", _("CANCEL"));
