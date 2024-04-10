@@ -22,6 +22,8 @@ class GuiMenuQuit : public GuiMenuBase
       QuitGui,
     };
 
+    std::vector<String> mMountPoints;
+
     /*
      * IGuiMenuBase implementation
      */
