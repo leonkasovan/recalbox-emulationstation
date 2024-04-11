@@ -10,6 +10,7 @@
 #include <utils/math/Misc.h>
 #include <RecalboxConf.h>
 #include <hardware/Board.h>
+#include <recalbox/RecalboxSystem.h>
 
 PulseAudioController::PulseAudioController()
   : mConnectionState(ConnectionState::NotConnected)
@@ -850,37 +851,43 @@ String PulseAudioController::SetDefaultPlayback(const String& originalPlaybackNa
   }
 }
 
+// # amixer get Master
+// Simple mixer control 'Master',0
+//   Capabilities: volume
+//   Playback channels: Front Left - Front Right
+//   Capture channels: Front Left - Front Right
+//   Limits: 0 - 255
+//   Front Left: 153 [60%]
+//   Front Right: 153 [60%]
 int PulseAudioController::GetVolume()
 {
-  // API Sync'
-  Mutex::AutoLock locker(mAPISyncer);
+  String volume = "";
 
-  return Math::clampi(RecalboxConf::Instance().AsInt("audio.volume"),0, 100);
+  std::pair<String, int> res = RecalboxSystem::execute("amixer get Master");
+  if (res.second == 0){
+    const char *p = strchr(res.first.c_str(),'[');
+    if (!p) return 50;
+    p++;
+    while (*p >= '0' && *p <= '9'){
+      volume.Append(*p++);
+    }
+    { LOG(LogDebug) << "[PulseAudioController] Get Volume = " << volume << "% success"; }
+    return volume.AsInt();
+  }else{
+    { LOG(LogError) << "[PulseAudioController] Get Volume fail"; }
+    return 50;
+  }
 }
 
 void PulseAudioController::SetVolume(int volume)
 {
-  // API Sync'
-  Mutex::AutoLock locker(mAPISyncer);
-
-  if (mPulseAudioContext == nullptr) return;
-
-  volume = Math::clampi(volume, 0, 100);
-
-  Mutex::AutoLock lock(mSyncer);
-
-  for(Sink& sink : mSinks)
-  {
-    pa_cvolume volumeStructure;
-    pa_cvolume_init(&volumeStructure);
-    pa_cvolume_set(&volumeStructure, sink.Channels, (PA_VOLUME_NORM * volume) / 100);
-
-    // Set volume
-    pa_operation* op = pa_context_set_sink_volume_by_index(mPulseAudioContext, sink.Index, &volumeStructure, SetVolumeCallback, this);
-    // Wait for result
-    mSignal.WaitSignal(sTimeOut);
-    // Release
-    pa_operation_unref(op);
+  char cmd[1024];
+  snprintf(cmd, 1203, "amixer set Master %d%%", volume);
+  std::pair<String, int> res = RecalboxSystem::execute(cmd);
+  if (res.second == 0){
+    { LOG(LogDebug) << "[PulseAudioController] Set Volume " << volume << "% success"; }
+  }else{
+    { LOG(LogError) << "[PulseAudioController] Set Volume " << volume << "% fail"; }
   }
 }
 

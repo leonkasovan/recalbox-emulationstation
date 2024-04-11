@@ -54,7 +54,7 @@ void RemotePlaylist::Run()
       DownloadFiles();
     }
   }
-  else { LOG(LogError) << "[RemotePlaylist] Not a patron"; }
+  else { LOG(LogDebug) << "[RemotePlaylist] Not a patron"; }
 }
 
 bool RemotePlaylist::DeserializePlaylist(const String& jsonString)

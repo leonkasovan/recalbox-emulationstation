@@ -123,7 +123,7 @@ MainRunner::ExitState MainRunner::Run()
 
     // Audio controller
     AudioController audioController;
-    audioController.SetVolume(audioController.GetVolume());
+    audioController.SetVolume(RecalboxConf::Instance().GetAudioVolume());
     String originalAudioDevice = RecalboxConf::Instance().GetAudioOuput();
     String fixedAudioDevice = audioController.SetDefaultPlayback(originalAudioDevice);
     if (fixedAudioDevice != originalAudioDevice)
@@ -1011,31 +1011,27 @@ void MainRunner::Completed(const HardwareTriggeredSpecialOperations& parameter, 
 void MainRunner::VolumeDecrease(BoardType board, float percent)
 {
   (void)board;
-  char cmd[1024];
 
   int value = RecalboxConf::Instance().GetAudioVolume() - (int)(100 * percent);
   value = Math::clampi(value, 0, 100);
   value = (value / 10) * 10;
-  // AudioController::Instance().SetVolume(value);
-  snprintf(cmd, 1203, "amixer set Master %d%%", value);
-  system(cmd);
+  AudioController::Instance().SetVolume(value);
   RecalboxConf::Instance().SetAudioVolume(value);
   RecalboxConf::Instance().Save();
+  mApplicationWindow->InfoPopupAdd(new GuiInfoPopup(*mApplicationWindow, "Set Volume to "+std::to_string(value)+ " %", 3, PopupType::Music));
 }
 
 void MainRunner::VolumeIncrease(BoardType board, float percent)
 {
   (void)board;
-  char cmd[1024];
 
   int value = RecalboxConf::Instance().GetAudioVolume() + (int)(100 * percent);
   value = Math::clampi(value, 0, 100);
   value = (value / 10) * 10;
-  // AudioController::Instance().SetVolume(value); // change using amixer x%
-  snprintf(cmd, 1203, "amixer set Master %d%%", value);
-  system(cmd);
+  AudioController::Instance().SetVolume(value);
   RecalboxConf::Instance().SetAudioVolume(value);
   RecalboxConf::Instance().Save();
+  mApplicationWindow->InfoPopupAdd(new GuiInfoPopup(*mApplicationWindow, "Set Volume to "+std::to_string(value)+ " %", 3, PopupType::Music));
 }
 
 void MainRunner::BrightnessDecrease(BoardType board, float percent)
