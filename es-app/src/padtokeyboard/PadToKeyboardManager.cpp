@@ -114,6 +114,11 @@ void PadToKeyboardManager::Sdl2EventReceived(const SDL_Event& sdlevent)
         else mMouseWriter.Write(mouseEvent); // Mouse moves must be sustained
         break;
       }
+      case MappingConfiguration::Types::Command:
+      {
+        // do nothing
+        break;
+      }
     }
 
   }

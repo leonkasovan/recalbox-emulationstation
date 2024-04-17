@@ -19,6 +19,7 @@ class MappingConfiguration
       KeyboardSequence, //!< Maps to a key sequence, one press & release one after each other
       MouseButton,      //!< Maps to a mouse button
       MouseMove,        //!< Maps to a mouse move
+      Command,          //!< Maps to a command => system(command)
     };
 
     //! Mouse move direction

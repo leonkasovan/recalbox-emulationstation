@@ -155,6 +155,14 @@ void MappingConfiguration::AssignMapping(const String& key, const String& value,
         }
   }
 
+  // Command Mapping -> store to "comment"
+  const char *cmd = value.c_str();
+  if (cmd[0] == '!'){
+    // short Codes[VirtualKeyboard::sMax];
+    mMapping[padNum].Assign(padItem, Types::Command, Codes, 1, 0, String(++cmd));
+    return;
+  }
+
   { LOG(LogWarning) << "[Pad2Keyboard] Unknown key or value: " << key << " = " << value; }
 }
 
@@ -232,6 +240,13 @@ MappingConfiguration::Types MappingConfiguration::Translate(Pad::Event& event, V
         }
         return Types::MouseMove;
       }
+      break;
+    }
+    case Types::Command:
+    {
+      { LOG(LogDebug) << "[MappingConfiguration.cpp] Execute command mapping " << mapping.Comment(event.Item); }
+      system(mapping.Comment(event.Item).c_str());
+      return Types::Command;
     }
   }
   return Types::None;
